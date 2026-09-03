@@ -1,9 +1,7 @@
 ---
-description: >
-  Use when writing or editing tests — test tree layout, fakes/mocks, pytest
-  markers, and how to run unit vs integration suites.
+trigger: model_decision
+description: Use when writing or editing tests - test tree layout, fakes/mocks, pytest markers, and how to run unit vs integration suites.
 globs: tests/**/*.py
-alwaysApply: false
 ---
 
 <!-- TEMPLATE: Inject-ready rule. Replace every FILL block with target-repo facts; delete this banner when done. -->

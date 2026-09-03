@@ -1,6 +1,6 @@
 ---
-trigger: always_on
-description: >
+trigger: model_decision
+description: Use when editing app/ Python - feature change checklist, post-change quality gate, and decision matrix.
 globs: app/**/*.py
 ---
 
