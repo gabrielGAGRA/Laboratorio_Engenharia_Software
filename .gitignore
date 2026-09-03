@@ -4,4 +4,7 @@ local
 .env
 venv
 env
+
+*.pyc
+
 *.zip

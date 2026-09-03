@@ -1,6 +1,6 @@
-# AI Platform — Repositório Padrão
+# Repositório Padrão
 
-Esse repositório é um template para APIs com arquitetura DDD/hexagonal, com regras de engenharia de software para APIs e uma versão adaptada para AI Platform. 
+Esse repositório é um template para APIs com arquitetura DDD/hexagonal, com regras de engenharia de software para APIs. 
 Além disso, contém regras de linting (`pyproject.toml`) estritas para automatizar mais checks de conformidade do software.
 
 ## Regras de código
@@ -9,10 +9,7 @@ Além disso, contém regras de linting (`pyproject.toml`) estritas para automati
   - Regras de software da Google + recomendações de PEP8, para APIs
   - https://google.github.io/styleguide/pyguide.html
   - \+ https://realpython.com/python-pep8/#when-to-ignore-pep-8
-- `docs/llm/AI-Platform/software-engineering-rules.md`
-  - Regras de software mas com adaptações pras regras de AI Platform
 - `pyproject.toml` — Ruff + Mypy
-- `pyproject-minimal.toml` — Alternativa mais enxuta que não checa violação DDD de imports
 
 ## Estrutura de rules com progressive disclosure
 
@@ -107,14 +104,7 @@ Adicionalmente, há uma automação que converte regras e skills do `.agents` pa
 ## Como usar
 
 1. Crie um repositório a partir deste template. Apague esse documento e mantenha só `README-padrão.md`
-2. Escolha as variantes que serão mantidas:
-   - **Lint**:
-     - `pyproject.toml` — Ruff + Mypy
-     - `pyproject-minimal.toml` — Alternativa mais enxuta que não checa violação DDD de imports
-   - **Regras Python** (apague uma):
-     - `docs/llm/software-engineering-rules.md`
-     - `docs/llm/AI-Platform/software-engineering-rules.md`
-3. Adapte o quality gate necessário
-4. Quando construir o projeto de fato, a IA deve automaticamente:
+2. Adapte o quality gate necessário
+3. Quando construir o projeto de fato, a IA deve automaticamente:
    1. Substituir os marcadores FILL nas regras e nos guias pelos fatos do novo projeto.
    2. Sincronizar as regras para as ferramentas suportadas com `python scripts/sync_agents.py` (veja Sincronização de regras).
