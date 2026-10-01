@@ -42,10 +42,10 @@ Avoid:
 
 ## Workflow
 
-	1.	Gather context: Read the changed or target code. Run coverage for the touched module or layer when scope is unclear.
-	2.	Map risk: Identify untested branches with meaningful business impact using the prioritization rules above.
-	3.	Read conventions: Before writing tests, read project-tests and docs/llm/software-engineering-rules.md for layout, AAA pattern, markers, and mocking rules.
-	4.	Validate: Run the narrowest relevant pytest target first, then the full suite if multiple layers changed.
+1.	Gather context: Read the changed or target code. Run coverage for the touched module or layer when scope is unclear.
+2.	Map risk: Identify untested branches with meaningful business impact using the prioritization rules above.
+3.	Read conventions: Before writing tests, read project-tests and docs/llm/software-engineering-rules.md for layout, AAA pattern, markers, and mocking rules.
+4.	Validate: Run the narrowest relevant pytest target first, then the full suite if multiple layers changed.
 
 ## Output format
 

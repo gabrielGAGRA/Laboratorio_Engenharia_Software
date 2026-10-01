@@ -5,17 +5,18 @@ globs: app/**/*.py
 ---
 
 <!-- TEMPLATE: Inject-ready rule. Replace every FILL block with target-repo facts; delete this banner when done. -->
+
 # Feature Change Checklist
 ## Post-change
 \t8.\tQuality gate: Problems should be fixed (or added to ignore, only if adequate) and run until pass.
 ruff format; ruff check --fix;
-mypy app tests;
-lint-imports;
+zuban app tests;
 find-dup-defs app --only py --error-thickness 0.3 -D @find-dup-defs.directives;
 \t9.\tDocs update: docs/llm guides as triggered by the decision matrix.
-\t10.\tRules / governance: Read @project-rules-writing only right before updating rules (invocation time).
+\t10.\tRules / governance: Read @project-rules-writing only right before updating rules.
 \t11.\tGit: Only when requested by user; if so, read @commit only at invocation time.
 \t12.\tAdversarial review: Use @adversarial-review; resolve Required findings and re-run affected verification.
+
 ## Decision Matrix
 After finishing a task, evaluate downstream updates. Open a file ONLY when a trigger below matches.
 | You Changed | Evaluate |

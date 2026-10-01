@@ -1,6 +1,6 @@
 ---
+trigger: always_on
 description: Workspace facts. Use for tech stack, hexagonal layout overview, primary codebase path, virtualenv location, and deferred work (TODO.md).
-alwaysApply: true
 ---
 
 <!-- TEMPLATE: Inject-ready rule. Replace every FILL block with target-repo facts; delete this banner when done. -->
@@ -12,7 +12,6 @@ alwaysApply: true
 - **Primary Codebase**: <!-- FILL: Root package path (e.g. app/). Discover: repo tree, pyproject.toml. Keep: one path or short phrase. -->
 - **Architecture**: <!-- FILL: One-line style (e.g. hexagonal / layered FastAPI). Discover: docs, app/ layout. Keep: short label. -->
 - **Virtualenv**: `.venv` at the repository root.
-- **Deploy**: <!-- FILL: Deploy target and entry (e.g. Lambda + pipeline/aws). Discover: pipeline/, README, Dockerfile. Keep: one line. -->
 
 
 # Deferred work (TODO.md)

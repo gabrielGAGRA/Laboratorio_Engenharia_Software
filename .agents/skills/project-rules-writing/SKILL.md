@@ -6,18 +6,6 @@ description: >
 
 # Project Rules Governance
 
-Single workflow for creating rules, updating conventions, and self-healing after mistakes. .agents/ is the sync source of truth but is not readable by the IDE agent. Prefer as last non-git step for rule/skill work.
-
-## Edit → copy → sync (required)
-
-Every governance edit ends with this — later sections say promote + sync instead of repeating commands.
-
-	1.	Edit inline in a folder the agent can access: .claude/, .cursor/, .github/ + root AGENTS.md.
-	2.	Copy into the matching path under .agents/ (Copy-Item). Map: .provider/rules/<name>.mdc → .agents/rules/<name>.md; skills keep SKILL.md; AGENTS.md → .agents/AGENTS.md.
-	3.	Sync — python scripts/sync_agents.py.
-
-NEVER read .agents/ files via terminal. Read what you can access, copy in and sync only.
-
 ## 1. Layer choice (Skill vs Rule vs Passive doc)
 
 | Layer | Canonical path | Purpose | When to use |
@@ -43,7 +31,7 @@ Keep 5–8 rule files; consolidate if approaching 10.
 	1.	Classify: orientation map (rule) vs punctual workflow (skill) vs passive doc only.
 	2.	Heavy doc — docs/llm/<topic>-guide.md (or append): guidelines, examples, trade-offs.
 
-	3.	Thin adapter — accessible platform rules folder (e.g. .cursor/rules/<name>.mdc): frontmatter (description, globs, alwaysApply: false) + short map. Point to the heavy doc for edge cases.
+	3.	Thin adapter — accessible platform rules folder (e.g. .agents/rules/<name>.mdc): frontmatter (description, globs, alwaysApply: false) + short map. Point to the heavy doc for edge cases.
 
 ```markdown
 ---
@@ -94,9 +82,3 @@ Trigger when: user corrects a recurring error; you lacked project context; a rul
 
 Update thin adapter only if globs/description or top invariants must change; update meta-rules only if routing changed. 
 	4.	Promote + sync.
-
-## 6. Create other skills
-
-	1.	Write .cursor/skills/<name>/SKILL.md (or Claude/GitHub equivalent) with name and description.
-	2.	Register trigger in meta-rules Skill Invocation table.
-	3.	Promote + sync.

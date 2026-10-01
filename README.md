@@ -1,3 +1,5 @@
+![Test status](https://github.com/...)
+
 # Repositório Padrão
 
 Esse repositório é um template para APIs com arquitetura DDD/hexagonal, com regras de engenharia de software para APIs. 
@@ -72,39 +74,3 @@ Por isso, a regra mais importante é a `meta-rules.md`. A segunda essencial é `
 
 ### Generalistas (opcionais):
 - **Fix test coverage** — Do Cursor (add-test-coverage)
-
-## Sincronização de regras (.agents)
-
-Adicionalmente, há uma automação que converte regras e skills do `.agents` para a convenção correta de regras de `.cursor`, `.claude` e `.github`. Assim, basta editar `.agents`, rodar `sync_agents.py` e todas regras são ajustadas corretamente. Isso é bom pois qualquer pessoa pode utilizar seu repositório sem esforço.
-
-```text
-                      ┌──────────────────────┐
-                      │   .agents/           │
-                      │  ├── AGENTS.md       │
-                      │  ├── rules/          │
-                      │  └── skills/         │
-                      └──────────┬───────────┘
-                                 │
-                     python scripts/sync_agents.py
-                                 │
-         ┌───────────────────────┼───────────────────────┐
-         ▼                       ▼                       ▼
-   ┌───────────┐           ┌───────────┐           ┌───────────┐
-   │  Cursor   │           │  Claude   │           │  Copilot  │
-   ├───────────┤           ├───────────┤           ├───────────┤
-   │.cursor/   │           │.claude/   │           │.github/   │
-   │rules/.mdc │           │  rules/   │           │instructions/│
-   │  skills/  │           │  skills/  │           │  skills/  │
-   │AGENTS.md  │           │CLAUDE.md  │           │AGENTS.md  │
-   └───────────┘           └───────────┘           └───────────┘
-```
-
----
-
-## Como usar
-
-1. Crie um repositório a partir deste template. Apague esse documento e mantenha só `README-padrão.md`
-2. Adapte o quality gate necessário
-3. Quando construir o projeto de fato, a IA deve automaticamente:
-   1. Substituir os marcadores FILL nas regras e nos guias pelos fatos do novo projeto.
-   2. Sincronizar as regras para as ferramentas suportadas com `python scripts/sync_agents.py` (veja Sincronização de regras).

@@ -17,19 +17,19 @@ Use a fresh local subagent whenever the environment provides one. Give it the ap
 
 ## Workflow
 
-	1.	Classify risk — always scope/regression; add contract compatibility for APIs, access/exposure for security or data, atomicity/idempotency for persistence or concurrency, and dependency boundaries/wiring for architecture. 
-	2.	Create falsifiable break hypotheses from the approved task/plan contract (when present) and diff. 
-	3.	Trace each hypothesis through affected code, tests, and boundary contracts. 
-	4.	Attempt to refute each candidate finding with code or executable evidence. Discard a candidate that cannot establish a reachable failure path. 
-	5.	Return one verdict:
+1.	Classify risk — always scope/regression; add contract compatibility for APIs, access/exposure for security or data, atomicity/idempotency for persistence or concurrency, and dependency boundaries/wiring for architecture. 
+2.	Create falsifiable break hypotheses from the approved task/plan contract (when present) and diff. 
+3.	Trace each hypothesis through affected code, tests, and boundary contracts. 
+4.	Attempt to refute each candidate finding with code or executable evidence. Discard a candidate that cannot establish a reachable failure path. 
+5.	Return one verdict:
 	⁃	pass — no evidence-backed Required finding remains;
 	⁃	blocked — a Required finding has a reproducible impact;
 	⁃	needs-human-decision — an unresolved product or risk trade-off blocks a reliable conclusion.
 
-	Example:
-	"Use the adversarial-review agent: try to break x before we ship"
-	* Agent reads the diff, migration and tests
-	"Verdict: tests pass but the y hole is still open. Do not ship."
+Example:
+"Use the adversarial-review agent: try to break x before we ship"
+* Agent reads the diff, migration and tests
+"Verdict: tests pass but the y hole is still open. Do not ship."
 
 
 ## Finding requirements

@@ -5,8 +5,6 @@ description: Manual-only. Re-ground a resumed task from repository evidence when
 
 # Catchup
 
-Manual invocation only. Do not run automatically at session start or when context is uncertain.
-
 ## Goal
 
 Recover an accurate, compact task state from the repository. Do not rely on chat history or an unverified task/plan artifact.

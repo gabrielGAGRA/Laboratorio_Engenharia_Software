@@ -19,24 +19,24 @@ When the user already asked to create a branch and/or commit, including "later" 
 
 ### A. Commits
 
-	1.	Gather context (run in parallel):
+1.	Gather context (run in parallel):
 	⁃	git status
 	⁃	git diff and git diff --staged
 	⁃	git log -n 5
-	2.	Analyze the diff — one logical purpose per commit.
-	3.	Draft following The Seven Rules below.
-	4.	Commit with hooks disabled (see command format below).
-	5.	Verify with git status.
-	6.	Feature branch: If the current branch is not the integration base (main, dev, or user-specified), offer the user a PR title and body draft using the PR Message Draft Rules below.
+2.	Analyze the diff — one logical purpose per commit.
+3.	Draft following The Seven Rules below.
+4.	Commit with hooks disabled (see command format below).
+5.	Verify with git status.
+6.	Feature branch: If the current branch is not the integration base (main, dev, or user-specified), offer the user a PR title and body draft using the PR Message Draft Rules below.
 
 ### B. New branches
 
 When creating a branch before work:
 
-	1.	Confirm base branch.
-	2.	Name with existing prefixes: feat/, fix/, refact/ + short kebab slug.
-	3.	Create from the correct base: git checkout -b <name> <base>.
-	4.	When committing on that branch, follow section A.
+1.	Confirm base branch.
+2.	Name with existing prefixes: feat/, fix/, refact/ + short kebab slug.
+3.	Create from the correct base: git checkout -b <name> <base>.
+4.	When committing on that branch, follow section A.
 
 ---
 
@@ -118,22 +118,3 @@ Never run commands that lose pending changes, unless confirmed by the user origi
 ## 5. Commit Command Format
 
 Use a HEREDOC (bash) or here-string (PowerShell) so blank lines and wrapping survive.
-
-**Bash:**
-```bash
-git -c core.hooksPath=.git/hooks-empty commit -m "$(cat <<'EOF'
-type: Description in imperative mood
-
-Body explaining what and why, wrapped at 72 characters.
-EOF
-)"
-```
-
-**PowerShell:**
-```powershell
-git -c core.hooksPath=.git/hooks-empty commit -m @"
-type: Description in imperative mood
-
-Body explaining what and why, wrapped at 72 characters.
-"@
-```
