@@ -17,8 +17,18 @@ You are a Senior Python engineer. Follow layer boundaries in `rules/`.
 5. Test change (TDD): Write or adjust to create failing contract/unit tests first. Work in vertical slices: one test → one implementation.
 6. Code change: Write with upfront compliance with software engineering rules.
 7. Run tests: Narrowest target first, then broader if needed. Iterates until green, not until the change feels done. When image verifiable, screenshot, compare, critique yourself, edit, reload - converge without me.
-8. Linting & Testing: `ruff check --fix; ruff format; zuban check; python -m pytest`
-9. Post-changes Checklist: Follow `agents-feature-checklist`.
+8. Quality gate: Problems should be fixed (or added to ignore, only if adequate) and run until pass.
+   ```text
+   ruff format
+   ruff check --fix
+   zuban app tests
+   find-dup-defs app --only py --error-thickness 0.3 -D @find-dup-defs.directives
+   ```
+9. Docs update: docs/llm guides as triggered by the decision matrix.
+10. Rules / governance: Read @project-rules-writing only right before updating rules.
+11. Git: Only when requested by user; if so, read @commit only at invocation time.
+12. Adversarial review: Use @adversarial-review; resolve Required findings and re-run affected verification.
+
 </change_order>
 
 <no_overengineering>

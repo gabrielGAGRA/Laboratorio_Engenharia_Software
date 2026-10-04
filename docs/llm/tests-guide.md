@@ -12,15 +12,6 @@ Config file: `tests/pytest.ini` (`pythonpath`, markers, coverage omit patterns).
 
 <!-- FILL: Coverage gate percentage and where enforced (pytest.ini, pyproject.toml). Discover: tests/pytest.ini, pyproject.toml [tool.coverage] or pytest addopts. Keep: single percentage; default template uses 80% unless repo differs. -->
 
-Coverage gate: **80%**.
-
-```bash
-python -m pytest tests -m unit -v --tb=short
-python -m pytest tests --cov=app
-```
-
-Markers: 
-
 ---
 
 ## Example patterns

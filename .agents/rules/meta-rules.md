@@ -7,12 +7,12 @@ description: Use for rule priority, where to find docs, and when to invoke skill
 
 # Meta rules
 ## Priority (highest -> lowest)
-\t1.\tAGENTS.md - persona and behavioral constraints
-\t2.\tproject-rules - repo scope, tech stack
-\t3.\tagents-feature-checklist - change order (before, during, and after implementation)
-\t4.\tproject-architecture / project-domain-api - layout and sandbox explanations and pointers
-\t5.\tproject-tests - test layout and pointers
-\t6.\tdocs/llm/software-engineering-rules.md - coding standards (passive; read only when implementing)
+1. AGENTS.md - persona and behavioral constraints
+2. project-rules - repo scope, tech stack
+3. agents-feature-checklist - change order (before, during, and after implementation)
+4. project-architecture / project-domain-api - layout and sandbox explanations and pointers
+5. project-tests - test layout and pointers
+6. docs/llm/software-engineering-rules.md - coding standards (passive; read only when implementing)
 
 ## Skill Invocation (single registry)
 | Trigger / Intent | Action |

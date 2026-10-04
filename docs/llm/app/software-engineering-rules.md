@@ -1,27 +1,5 @@
 # Python Engineering Rules
 
-Repo-agnostic Python standards. Repo-specific layout, wiring, and contracts live in the architecture and domain guides.
-
----
-
-## Editing this Doc
-
-Use this document for decisions a linter/formatter cannot enforce reliably. Automate what is objective and stable; document what needs judgment, rationale, or an exception process.
-
-### Lint vs this doc
-- **Mechanical**: `pyproject.toml` is authoritative for mechanical rules: formatting and naming, imports, banned APIs, layer imports.
-- **Lint on + one judgment line**: recurring legitimate exceptions (for example: broad except at isolation points that re-raise or `logging.exception` — allowed). Scoped per-layer ignores live in `per-file-ignores`.
-- **Ignored in pyproject + judgment here**: ternaries; per-symbol docstring headers; when a function/class docstring is worth writing.
-- **This doc only**: architecture, auth transport, data-modeling choice, wiring, comment necessity, error-message content.
-
-*Why*: add a brief *Why* only when a rule deliberately counters a common model/tutorial default. A plain directive is enough for ordinary practice.
-
-### Modal verbs
-- **NEVER / ALWAYS** — hard constraints; violations need an explicit, documented exception.
-- **Prefer / Avoid** — defaults when both options work; follow unless local style or a NEVER/ALWAYS instruction contradicts the design.
-
----
-
 ## 1. Imports and Packages
 
 - **Absolute imports**: Default for project code.
@@ -31,6 +9,7 @@ Use this document for decisions a linter/formatter cannot enforce reliably. Auto
 - **Direct symbol import** for stable, unambiguous types and public interfaces (`from package.models.user import User`).
 - Avoid wildcard imports outside tightly controlled package re-exports.
 - **Stdlib / third-party**: Symbol imports are fine (`from pydantic import BaseModel`).
+- **Lazy imports**: Use explicit `lazy import` / `lazy from ... import ...` for startup-sensitive paths (e.g., CLI entry points, heavy optional dependencies). NEVER use lazy imports to conceal circular dependencies or deferred side effects. Avoid immediate module-level access of lazy imports.
 - **No import-time side effects**: NEVER load configuration, create network/database clients, or perform environment-dependent registration at import time. Defer to the composition root.
 
 ---
@@ -64,6 +43,7 @@ Apply before inventing a new module or leaving a “sparse” constant beside un
   - Used in more than one place → keep with the natural owner (enum member/set, domain rule module, contract module). Import it. NEVER create a file whose only job is holding unrelated constants.
   - Module-public only when another module or tests must read it; otherwise `_name`.
   - NEVER put domain invariants, transport/contract names, or persistence sentinels on the settings model — those are not env knobs.
+  - **Sentinels**: Prefer built-in `sentinel()` for default parameters, missing markers, or cache indicators instead of custom sentinel classes or `object()` instances.
 - **Functions**
   - Used only by one class → instance / class / static method on that class.
   - Used only by one function → nest inside it (no module-level `_helper` for a single caller).
@@ -76,7 +56,7 @@ Apply before inventing a new module or leaving a “sparse” constant beside un
 - **Mutable globals**: Avoid process-wide mutable state; if needed, `_name` + accessors. Module constants that follow the placement rules above are fine.
 - **Nested classes/functions**: Prefer nesting when the helper has a single caller (including helpers that do not close over locals). Prefer module-level `_name` only when shared by multiple call sites or when nesting hurts readability.
 - **Module-level functions**: Put behavior that conceptually belongs to a type on that type. Prefer a dedicated helpers module over a pile of `_validate_*` / `_apply_*` helpers beside a use case that operate on domain objects (anemic-domain smell).
-- **Comprehensions**: Keep readable at a glance. Use explicit loops or helpers for nested conditions, side effects, or complex expressions; keep comprehensions for selection/mapping. Move business logic into objects or named domain policies.
+- **Comprehensions**: Keep readable at a glance. Unpacking in comprehensions (`[*items for items in batch]`, `{**d for d in records}`) is allowed for clean flattening. Use explicit loops or helpers for nested conditions, complex multi-step expressions, or side effects; keep comprehensions for selection/mapping. Move business logic into objects or named domain policies.
 - **Iteration**: Do not mutate the container while iterating (snapshot or new collection; queue-drain OK).
 - **Lambdas**: Short local callbacks OK; prefer `operator` when clearer.
 - **Ternaries**: Short, side-effect-free only; no nesting; use `if`/`else` when a branch needs explanation.
@@ -88,7 +68,7 @@ Apply before inventing a new module or leaving a “sparse” constant beside un
 - **Async**: NEVER run blocking I/O or subprocess work on the event loop, suppress cancellation, or create unbounded tasks/queues. ALWAYS set outbound timeouts. Bound concurrency and queues. Prefer structured ownership and lifecycle for spawned tasks. Retry only bounded, idempotent, clearly transient operations.
 - **Data modeling** — choose by domain role first (entity / value object / DTO), then by validation and serialization needs:
   - **Entity / aggregate** — explicit class when the concept has identity, lifecycle, mutable state, business invariants, or behavior. Keep state private where practical; expose intention-revealing operations instead of arbitrary field mutation. Equality is identity-based unless documented otherwise. A public operation must leave the object valid.
-  - **Value object** — immutable, value-based equality; validates itself at construction; may contain behavior. Prefer an explicit immutable class (or a frozen model when construction-time validation is valuable). Do not expose mutable internals.
+  - **Value object** — immutable, value-based equality; validates itself at construction; may contain behavior. Prefer an explicit immutable class (or a frozen model when construction-time validation is valuable), using built-in `frozendict` for immutable mappings. Do not expose mutable internals.
   - **DTO** — a validation model at transport, configuration, and external-data boundaries. DTOs must not become domain entities merely because they validate input.
   - Use a validation library (e.g. Pydantic) at API/config boundaries and for untrusted or weakly typed payloads. Map DB rows explicitly to domain entities/value objects; validate at the mapper boundary when schema uncertainty warrants it. NEVER make the domain validation-library-shaped solely for transport. Avoid `@dataclass`; prefer a validation model or an explicit class.
   - `NamedTuple` — lightweight immutable record, no behavior. Do not choose it mainly for hashability.
@@ -117,7 +97,7 @@ Apply before inventing a new module or leaving a “sparse” constant beside un
 - **Quoted annotations**: Use only when runtime must not resolve the type. Do not treat them as a universal circular-import fix; they can defer a failure to framework startup or runtime.
 - **Deferred evaluation (Python 3.14+)**: Changes *when* annotations resolve, not whether frameworks need them. Introspection paths remain sensitive to namespace and framework behavior.
 - **Annotations are not validation**: At API and integration boundaries, annotations state intended types; they do not validate runtime data. Explicit validators or adapter mappers enforce runtime contracts.
-- `Self` for fluent/self-returning APIs; CapWords type aliases; `T` / `UserT` for TypeVars.
+- `Self` for fluent/self-returning APIs; `TypeForm` when accepting runtime types/classes as parameters; CapWords type aliases; `T` / `UserT` for TypeVars.
 - Annotate assignments only when inference is ambiguous, public, or contractual — not every local.
 - `tuple` vs `list` by mutability / fixed vs variable length.
 
@@ -221,4 +201,3 @@ If you’re editing code, take a few minutes to look at the code around you and 
 The point of having style guidelines is to have a common vocabulary of coding so people can concentrate on what you’re saying rather than on how you’re saying it. We present global style rules here so you know the vocabulary, but local style is also important. If code you add to a file looks drastically different from the existing code around it, it throws readers out of their rhythm when they go to read it.
 
 However, there are limits to consistency. It applies more heavily locally and on choices unspecified by the global style. Consistency should not generally be used as a justification to do things in an old style without considering the benefits of the new style, or the tendency of the codebase to converge on newer styles over time. 
-* If the user wants to move to a new, better style, they should have the option.

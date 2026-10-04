@@ -81,4 +81,4 @@ Trigger when: user corrects a recurring error; you lacked project context; a rul
 ```
 
 Update thin adapter only if globs/description or top invariants must change; update meta-rules only if routing changed. 
-	4.	Promote + sync.
+4. Promote + sync.

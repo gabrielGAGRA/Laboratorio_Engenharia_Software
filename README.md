@@ -11,7 +11,7 @@ Além disso, contém regras de linting (`pyproject.toml`) estritas para automati
   - Regras de software da Google + recomendações de PEP8, para APIs
   - https://google.github.io/styleguide/pyguide.html
   - \+ https://realpython.com/python-pep8/#when-to-ignore-pep-8
-- `pyproject.toml` — Ruff + Mypy
+- `pyproject.toml` — Ruff + Zuban
 
 ## Estrutura de rules com progressive disclosure
 

@@ -1,0 +1,5 @@
+Uma primeira declaração: esse repositorio foi construido em cima do X repositorio padrao
+Esse repositorio foi construido no quadrimestre de estagio. Foi utilizado IA para agilizar sua criacao, 
+boa parte dele eh em melhorar o uso de IA agentica, mas as boas praticas (regras de software e linting) 
+vieram principalmente do https://github.com/google/styleguide/blob/gh-pages/pyguide.md e do PEP8.
+
