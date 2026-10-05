@@ -5,8 +5,8 @@
 ### Time: Crazy Frogs
 Membros:
 - Carolina Britto Haddad
-- Gabriel Agra de Castro Motta
 - Fernando Mendes Seraco
+- Gabriel Agra de Castro Motta
 - Mateus Silva de Araújo
 
 ## Sumário
@@ -43,9 +43,9 @@ O projeto é composto por duas frentes:
 - Feed central de novas faixas que descarta músicas já avaliadas ou gêneros bloqueados.
 - Avaliação gestual rápida:
   - **Like (Direita)**: Envia a música para as Curtidas.
-  - **Superlike / Amar (Cima)**: Adiciona a faixa às Amadas e Curtidas em lista separada.
+  - **Superlike (Cima)**: Adiciona a faixa às Amadas e Curtidas em lista separada.
   - **Rejeitar (Esquerda)**: Remove a música de futuras recomendações e sugestões de playlists.
-- **Desfazer Ação (Undo)**: Botão para restaurar a última faixa avaliada em caso de toque acidental.
+- **Desfazer Ação**: Botão para restaurar a última faixa avaliada em caso de toque acidental.
 
 #### 3. Playlists Inteligentes e Contextuais
 - **Montagem por Swipe**: Modo de adicionar músicas a uma playlist via gestos sem poluir a lista global de Curtidas.
@@ -95,7 +95,7 @@ O projeto é composto por duas frentes:
 ## Arquitetura e Tecnologias
 
 - **Frontend**: TypeScript e Angular (Framework).
-- **Backend / APIs**: FastAPI, Pydantic, Asyncio, PyTest, PostgreSQL, Ruff e Zuban.
+- **Backend**: Python -- FastAPI.
 
 ---
 
