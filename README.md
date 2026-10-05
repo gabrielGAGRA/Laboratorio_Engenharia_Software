@@ -22,17 +22,17 @@ Membros:
 
 ## Sobre o Projeto
 
-O **Ribbit** redefine a experiência de encontrar novas músicas no ambiente móvel através de uma mecânica interativa inspirada em cartões de *swipe*, aliando geração dinâmica de playlists, sessões colaborativas em tempo real (*Jams*) e controle rígido de privacidade musical. 
+O **Ribbit** redefine a experiência de encontrar novas músicas através de uma mecânica interativa inspirada em cartões de *swipe*, aliando geração dinâmica de playlists, sessões colaborativas em tempo real (*Jams*) e controle rígido de privacidade musical. 
 
 O projeto é composto por duas frentes:
-1. **Ribbit Mobile**: Aplicativo voltado ao usuário final para descoberta, criação de playlists inteligentes e interação social em grupo.
+1. **Ribbit**: Aplicativo voltado ao usuário final para descoberta, criação de playlists inteligentes e interação social em grupo.
 2. **Ribbit Admin Console**: Painel web restrito para curadoria de catálogo com *Soft Delete* e monitoramento de métricas financeiras.
 
 ---
 
 ## Funcionalidades
 
-### Aplicativo Mobile
+### Aplicativo 
 
 #### 1. Onboarding e Preferências
 - Cadastro completo de usuários com validação de dados.
@@ -52,7 +52,7 @@ O projeto é composto por duas frentes:
 - **Duração Exata**: Ajuste algorítmico da duração planejada com margem de erro máxima de $\pm 1$ minuto.
 - **Momentos de Evento**: Criação de blocos com durações e gêneros distintos para eventos complexos.
 - **Lineup de Festivais**: Geração de sugestões baseada em múltiplos artistas informados.
-- **Filtros Contextuais**: Playlists por localização/viagem, clima/vibe, época (anos/filmes/séries) e atividades específicas (treino, estudo).
+- **Filtros Contextuais**: Playlists por localização/viagem, clima/vibe, época (década ou ano) e atividades específicas (treino, estudo).
 - **Modo Referência**: Geração automática com base em Curtidas, Amadas ou playlists prévias.
 
 #### 4. Jams Colaborativas
@@ -63,14 +63,15 @@ O projeto é composto por duas frentes:
 - Acompanhamento do tempo total e restante com margem de tolerância de $\pm 1$ minuto.
 
 #### 5. Busca, Comunidade e Lançamentos
-- Busca universal por faixa, artista, álbum, gênero e contextos.
-- Feed de novos lançamentos personalizados com suporte à avaliação imediata.
+- Busca universal por faixa, artista, álbum ou gênero.
+- Feed com suporte à avaliação imediata.
 - Publicação, edição e exclusão de comentários e avaliações comunitárias em cada música.
 
 #### 6. Perfil e Dados
 - Gestão e edição de listas de Curtidas, Amadas, Rejeitadas e Artistas favoritos.
 - Dashboard pessoal com artistas principais, gêneros predominantes, entre outras estatísticas.
 - Exclusão transparente de dados sob solicitação do usuário.
+- Edição do plano de assinatura
 
 
 ---
