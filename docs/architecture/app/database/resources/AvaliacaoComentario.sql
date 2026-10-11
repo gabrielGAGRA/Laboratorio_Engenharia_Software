@@ -18,7 +18,7 @@ CREATE TABLE avaliacoes_comentarios (
     CONSTRAINT ck_avaliacoes_likes CHECK (likes_count >= 0)
 );
 
--- Uma avaliação ativa por usuário e música (permite reavaliar após exclusão lógica)
+-- Uma avaliação ativa por usuário e música
 CREATE UNIQUE INDEX uq_avaliacoes_usuario_musica ON avaliacoes_comentarios (usuario_id, musica_id) WHERE NOT is_deleted;
 
 -- Índices de consulta e FK

@@ -1,4 +1,4 @@
--- Extensão para busca por similaridade (ILIKE / %) em títulos e nomes
+-- Extensão para busca por similaridade em títulos e nomes
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 -- Mantém atualizado_em sincronizado em qualquer tabela que o possua
