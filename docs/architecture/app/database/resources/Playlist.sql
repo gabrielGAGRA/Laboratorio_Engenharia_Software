@@ -3,16 +3,13 @@ CREATE TABLE playlists (
     usuario_id INT NOT NULL,
     nome VARCHAR(255) NOT NULL,
     descricao TEXT,
-    duracao_alvo_ms INT,
     spotify_playlist_id VARCHAR(64),
-    -- Derivada: evita divergir de spotify_playlist_id
     is_exportada BOOLEAN GENERATED ALWAYS AS (spotify_playlist_id IS NOT NULL) STORED,
     criado_em TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     atualizado_em TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_playlists_usuario
-        FOREIGN KEY (usuario_id) REFERENCES usuarios (usuario_id)
-        ON DELETE CASCADE,
-    CONSTRAINT ck_playlists_duracao_alvo CHECK (duracao_alvo_ms IS NULL OR duracao_alvo_ms > 0)
+    CONSTRAINT fk_playlists_usuario 
+        FOREIGN KEY (usuario_id) REFERENCES usuarios (usuario_id) 
+        ON DELETE CASCADE
 );
 
 CREATE INDEX idx_playlists_usuario ON playlists (usuario_id);

@@ -4,12 +4,19 @@ CREATE TABLE jams (
     nome_sala VARCHAR(150) NOT NULL,
     codigo_sala VARCHAR(32) NOT NULL,
     is_ativa BOOLEAN NOT NULL DEFAULT TRUE,
+    musica_atual_id INT,
     criado_em TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_jams_host
-        FOREIGN KEY (host_usuario_id) REFERENCES usuarios (usuario_id)
-        ON DELETE CASCADE
+    CONSTRAINT fk_jams_host 
+        FOREIGN KEY (host_usuario_id) REFERENCES usuarios (usuario_id) 
+        ON DELETE CASCADE,
+    CONSTRAINT fk_jams_musica_atual 
+        FOREIGN KEY (musica_atual_id) REFERENCES musicas (musica_id) 
+        ON DELETE SET NULL
 );
 
--- Código único apenas entre salas ativas (permite reaproveitar após encerrar)
+-- Código único entre salas ativas (permite reutilização após término)
 CREATE UNIQUE INDEX uq_jams_codigo_ativa ON jams (codigo_sala) WHERE is_ativa;
+
+-- Índices para Foreign Keys
 CREATE INDEX idx_jams_host ON jams (host_usuario_id);
+CREATE INDEX idx_jams_musica_atual ON jams (musica_atual_id);

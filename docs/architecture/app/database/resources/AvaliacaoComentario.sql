@@ -8,21 +8,22 @@ CREATE TABLE avaliacoes_comentarios (
     is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
     criado_em TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     atualizado_em TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_avaliacoes_usuario
-        FOREIGN KEY (usuario_id) REFERENCES usuarios (usuario_id)
+    CONSTRAINT fk_avaliacoes_usuario 
+        FOREIGN KEY (usuario_id) REFERENCES usuarios (usuario_id) 
         ON DELETE CASCADE,
-    CONSTRAINT fk_avaliacoes_musica
-        FOREIGN KEY (musica_id) REFERENCES musicas (musica_id)
+    CONSTRAINT fk_avaliacoes_musica 
+        FOREIGN KEY (musica_id) REFERENCES musicas (musica_id) 
         ON DELETE RESTRICT,
     CONSTRAINT ck_avaliacoes_nota CHECK (nota BETWEEN 1 AND 5),
     CONSTRAINT ck_avaliacoes_likes CHECK (likes_count >= 0)
 );
 
--- Uma avaliação ativa por usuário/música (permite reavaliar após exclusão lógica)
+-- Uma avaliação ativa por usuário e música (permite reavaliar após exclusão lógica)
 CREATE UNIQUE INDEX uq_avaliacoes_usuario_musica ON avaliacoes_comentarios (usuario_id, musica_id) WHERE NOT is_deleted;
--- Listagem por música, mais recentes primeiro
-CREATE INDEX idx_avaliacoes_musica_recentes ON avaliacoes_comentarios (musica_id, criado_em DESC) WHERE NOT is_deleted;
+
+-- Índices de consulta e FK
 CREATE INDEX idx_avaliacoes_usuario ON avaliacoes_comentarios (usuario_id);
+CREATE INDEX idx_avaliacoes_musica ON avaliacoes_comentarios (musica_id, criado_em DESC) WHERE NOT is_deleted;
 
 CREATE TRIGGER trg_avaliacoes_atualizado_em
     BEFORE UPDATE ON avaliacoes_comentarios

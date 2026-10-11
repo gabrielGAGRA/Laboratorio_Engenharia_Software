@@ -4,29 +4,33 @@ CREATE TABLE usuarios (
     senha_hash VARCHAR(255) NOT NULL,
     spotify_id VARCHAR(64),
     nome_exibicao VARCHAR(150) NOT NULL,
-    data_nascimento DATE NOT NULL,
+    idade INT NOT NULL,
     plano_id INT NOT NULL,
     titular_id INT,
+    generos_bloqueados TEXT,
     is_admin BOOLEAN NOT NULL DEFAULT FALSE,
     criado_em TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     atualizado_em TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_usuarios_plano
-        FOREIGN KEY (plano_id) REFERENCES planos (plano_id)
+    CONSTRAINT fk_usuarios_plano 
+        FOREIGN KEY (plano_id) REFERENCES planos (plano_id) 
         ON DELETE RESTRICT,
-    CONSTRAINT fk_usuarios_titular
-        FOREIGN KEY (titular_id) REFERENCES usuarios (usuario_id)
-        ON DELETE CASCADE,
-    CONSTRAINT ck_usuarios_titular_diferente CHECK (titular_id IS NULL OR titular_id <> usuario_id),
-    CONSTRAINT ck_usuarios_nascimento CHECK (data_nascimento <= CURRENT_DATE)
+    CONSTRAINT fk_usuarios_titular 
+        FOREIGN KEY (titular_id) REFERENCES usuarios (usuario_id) 
+        ON DELETE SET NULL,
+    CONSTRAINT ck_usuarios_idade CHECK (idade >= 0),
+    CONSTRAINT ck_usuarios_titular_diferente CHECK (titular_id IS NULL OR titular_id <> usuario_id)
 );
 
 -- E-mail único sem diferenciar maiúsculas de minúsculas
 CREATE UNIQUE INDEX uq_usuarios_email ON usuarios (LOWER(email));
+CREATE UNIQUE INDEX uq_usuarios_spotify_id ON usuarios (spotify_id) WHERE spotify_id IS NOT NULL;
+
+-- Índices para Foreign Keys
 CREATE INDEX idx_usuarios_plano ON usuarios (plano_id);
 CREATE INDEX idx_usuarios_titular ON usuarios (titular_id);
 
--- Garante que o titular seja uma conta principal e que max_perfis do plano dele seja respeitado
-CREATE FUNCTION valida_perfil_titular() RETURNS TRIGGER AS $$
+-- Validação de limite de perfis vinculados ao titular
+CREATE OR REPLACE FUNCTION valida_perfil_titular() RETURNS TRIGGER AS $$
 DECLARE
     max_permitido INT;
     perfis_existentes INT;
