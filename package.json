@@ -1,0 +1,23 @@
+{
+  "name": "lab-engenharia-software-view",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "node ./node_modules/typescript-7/bin/tsc --noEmit",
+    "lint": "oxlint --type-aware src/ && eslint .",
+    "lint:fix": "oxlint --type-aware --fix src/ && eslint . --fix",
+    "format": "oxfmt --write \"src/**/*.{ts,html,css,scss,json}\" *.mjs",
+    "format:check": "oxfmt --check \"src/**/*.{ts,html,css,scss,json}\" *.mjs"
+  },
+  "devDependencies": {
+    "@total-typescript/ts-reset": "^0.6.1",
+    "angular-eslint": "^22.6.0",
+    "eslint": "^10.12.0",
+    "eslint-plugin-oxlint": "^1.87.0",
+    "oxfmt": "^0.72.0",
+    "oxlint": "^1.87.0",
+    "oxlint-tsgolint": "^7.0.2004",
+    "typescript": "npm:@typescript/typescript6@^6.0.2",
+    "typescript-7": "npm:typescript@^7.0.2"
+  }
+}

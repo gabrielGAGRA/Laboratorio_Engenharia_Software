@@ -1,211 +1,84 @@
-Introduction
-This guide covers a range of style conventions for Angular application code. These recommendations are not required for Angular to work, but instead establish a set of coding practices that promote consistency across the Angular ecosystem. A consistent set of practices makes it easier to share code and move between projects.
+# Angular Engineering Rules & Style Guide
 
-This guide does not cover TypeScript or general coding practices unrelated to Angular. For TypeScript, check out Google's TypeScript style guide.
+Scope: Angular view only (`src/`). Formatting is handled by Oxfmt; mechanical syntax checks are enforced via `.oxlintrc.json` and `eslint.config.mjs` and not repeated in depth. General TypeScript standards (immutability, error handling, typing) follow `typescript-engineering-rules.md`.
 
-When in doubt, prefer consistency
-Whenever you encounter a situation in which these rules contradict the style of a particular file, prioritize maintaining consistency within a file. Mixing different style conventions in a single file creates more confusion than diverging from the recommendations in this guide.
+Gate: `npm run format`, `npm run lint:fix`, `npm run typecheck`.
 
-Naming
-Separate words in file names with hyphens
-Separate words within a file name with hyphens (-). For example, a component named UserProfile has a file name user-profile.ts.
+---
 
-Use the same name for a file's tests with .spec at the end
-For unit tests, end file names with .spec.ts. For example, the unit test file for the UserProfile component has the file name user-profile.spec.ts.
+## 1. Architecture & Component Model
 
-Match file names to the TypeScript identifier within
-File names should generally describe the contents of the code in the file. When the file contains a TypeScript class, the file name should reflect that class name. For example, a file containing a component named UserProfile has the name user-profile.ts.
+- ALWAYS use standalone components, directives, and pipes; NEVER introduce new `NgModule`s.
+  Why: Standalone primitives eliminate module indirection, enable fine-grained tree-shaking, and simplify the dependency graph. [Lint: yes (`@angular-eslint/prefer-standalone`)]
+- ALWAYS organize files by feature areas inside `src/` (e.g., `src/movies/booking/`); NEVER group files by technical category (e.g., `components/`, `services/`, `directives/`).
+  Why: Co-locating related units reduces context switching and isolates blast radius during refactors. [Lint: no]
+- ALWAYS keep application bootstrap inside `src/main.ts` using `bootstrapApplication()`.
+  Why: Maintains a uniform, predictable entry point across applications. [Lint: no]
+- ALWAYS keep source files focused on a single concept (one component, directive, or service per file).
+  Why: Prevents bloated files and keeps tests, templates, and styles aligned 1:1. [Lint: no]
 
-If the file contains more than one primary namable identifier, choose a name that describes the common theme to the code within. If the code in a file does not fit within a common theme or feature area, consider breaking the code up into different files. Avoid overly generic file names like helpers.ts, utils.ts, or common.ts.
+## 2. State Management & Reactivity
 
-Use the same file name for a component's TypeScript, template, and styles
-Components typically consist of one TypeScript file, one template file, and one style file. These files should share the same name with different file extensions. For example, a UserProfile component can have the files user-profile.ts, user-profile.html, and user-profile.css.
+- ALWAYS use Signals (`signal()`, `computed()`, `effect()`) for local and component-level reactive state; NEVER use `BehaviorSubject` or `Subject` for basic view state.
+  Why: Signals provide synchronous, glitch-free reactivity with automatic dependency tracking and zero subscription leak risk. [Lint: yes (`@angular-eslint/prefer-signals`)]
+- ALWAYS use signal-based inputs (`input()`, `input.required()`), outputs (`output()`), and two-way models (`model()`); NEVER use `@Input()`, `@Output()`, or `@Model()` decorators.
+  Why: Provides compile-time type safety, cleaner reactivity, and avoids decorator-based lifecycle lag. [Lint: yes (`@angular-eslint/prefer-signals`, `@angular-eslint/prefer-signal-model`)]
+- ALWAYS invoke signals as functions with parentheses `mySignal()` in templates and TS code; NEVER pass an uncalled signal reference where the value is expected.
+  Why: An uncalled signal reference is an object/function that evaluates truthy, creating silent logical bugs. [Lint: yes (`@angular-eslint/no-uncalled-signals`)]
+- ALWAYS treat signal state as immutable; update signals using `.set()` or `.update()`, NEVER mutate objects inside a signal in-place.
+  Why: Direct object mutations bypass change notifications and break downstream `computed()` tracking. [Lint: no]
+- ALWAYS keep `computed()` signals pure and return a value; NEVER perform side effects inside a computed expression.
+  Why: Computed signals evaluate lazily and memoize values; side effects cause unpredictable, repeated executions. [Lint: yes (`@angular-eslint/computed-must-return`)]
+- ALWAYS prefer signal-based services for shared feature state. Use NgRx SignalStore for intermediate cross-feature state, and full NgRx only with explicit architectural justification.
+  Why: Minimizes boilerplate and keeps state close to consumption points without unneeded global store overhead. [Lint: no]
 
-If a component has more than one style file, append the name with additional words that describe the styles specific to that file. For example, UserProfile might have style files user-profile-settings.css and user-profile-subscription.css.
+## 3. Dependency Injection
 
-Project structure
-All the application's code goes in a directory named src
-All of your Angular UI code (TypeScript, HTML, and styles) should live inside a directory named src. Code that's not related to UI, such as configuration files or scripts, should live outside the src directory.
+- ALWAYS inject dependencies using `inject()`; NEVER use constructor parameter injection for dependencies.
+  Why: Guarantees cleaner type inference, eliminates constructor boilerplate, simplifies class inheritance, and plays cleanly with class field initializers. [Lint: yes (`@angular-eslint/prefer-inject`)]
+- ALWAYS place `inject()` declarations at the top of the class before methods and other properties.
+  Why: Surfacing dependencies at the class boundary standardizes readability. [Lint: yes (`@angular-eslint/inject-at-top`)]
+- ALWAYS declare shared services with `{ providedIn: 'root' }` unless scoped instance lifecycle is required.
+  Why: Guarantees tree-shakable singletons without polluting module providers. [Lint: yes]
+- NEVER subscribe to Observables inside constructors or field initializers; bridge to signals via `toSignal()` in an injection context or manage lifecycles with `takeUntilDestroyed()`.
+  Why: Prevents memory leaks and ensures cleanup upon component destruction. [Lint: yes (`@angular-eslint/no-implicit-take-until-destroyed`)]
 
-This keeps the root application directory consistent between different Angular projects and creates a clear separation between UI code and other code in your project.
+## 4. Components, Templates & Change Detection
 
-Bootstrap your application in a file named main.ts directly inside src
-The code to start up, or bootstrap, an Angular application should always live in a file named main.ts. This represents the primary entry point to the application.
+- ALWAYS design for Zoneless change detection with `ChangeDetectionStrategy.OnPush`.
+  Why: Signals explicitly schedule DOM notifications, removing Zone.js runtime monkey-patching overhead and optimizing rendering performance. [Lint: yes (`@angular-eslint/prefer-on-push-component-change-detection`)]
+- NEVER call `ChangeDetectorRef.markForCheck()` or `detectChanges()` when using signals properly.
+  Why: Signal modifications notify the zoneless scheduler automatically; manual checks bypass the reactivity graph. [Lint: no]
+- ALWAYS use modern built-in control flow (`@if`, `@for`, `@switch`); NEVER use legacy structural directives (`*ngIf`, `*ngFor`, `*ngSwitch`).
+  Why: Built-in control flow is faster, provides proper TypeScript type-narrowing in templates, and does not require directive imports. [Lint: yes (`@angular-eslint/template/prefer-control-flow`)]
+- ALWAYS provide a unique `track` key in `@for` blocks.
+  Why: Eliminates DOM thrashing and preserves element state when lists update. [Lint: yes]
+- ALWAYS use direct class and style bindings (`[class.foo]="..."`, `[style.color]="..."`); NEVER use `NgClass` or `NgStyle`.
+  Why: Native attribute bindings are faster, avoid importing directive dependencies, and align with standard HTML. [Lint: yes (`no-restricted-imports`, `@angular-eslint/template/prefer-class-binding`, `@angular-eslint/template/prefer-style-binding`)]
+- ALWAYS keep components presentation-focused; delegate business logic, data transformations, and orchestration to services or pure functions.
+  Why: Decouples UI from business logic and maximizes testability. [Lint: no]
+- NEVER write complex expressions or nested conditions in templates; extract them to `computed()` properties on the component.
+  Why: Keeps template declarative and maintainable. [Lint: no]
+- ALWAYS mark properties used only in templates as `protected` and Angular-initialized properties as `readonly`, in compliance with `typescript-engineering-rules.md`.
+  Why: Prevents leaking template internal state into the public DI/query API and protects bound references against accidental reassignment. [Lint: yes (`@angular-eslint/prefer-output-readonly`, `typescript/prefer-readonly`)]
+- ALWAYS name event handlers after the business action (`saveProfile()`), NEVER after the DOM trigger event (`handleClick()`).
+  Why: Expresses intent directly in template bindings. [Lint: no]
+- ALWAYS keep lifecycle methods concise by delegating work to helper methods, and ALWAYS implement lifecycle interfaces (`OnInit`, `OnDestroy`).
+  Why: Guarantees correct method spelling and maintains readable initialization sequences. [Lint: yes (`@angular-eslint/use-lifecycle-interface`, `@angular-eslint/no-empty-lifecycle-method`)]
+- NEVER declare lifecycle hooks as `async` (`async ngOnInit()`).
+  Why: Angular does not await lifecycle promises; async hooks hide unhandled rejections and cause execution race conditions. [Lint: yes (`@angular-eslint/no-async-lifecycle-method`)]
 
-Group closely related files together in the same directory
-Angular components consist of a TypeScript file and, optionally, a template and one or more style files. You should group these together in the same directory.
+## 5. Naming & Layout
 
-Unit tests should live in the same directory as the code-under-test. Avoid collecting unrelated tests into a single tests directory.
-
-Organize your project by feature areas
-Organize your project into subdirectories based on the features of your application or common themes to the code in those directories. For example, the project structure for a movie theater site, MovieReel, might look like this:
-
-src/
-├─ movie-reel/
-│ ├─ show-times/
-│ │ ├─ film-calendar/
-│ │ ├─ film-details/
-│ ├─ reserve-tickets/
-│ │ ├─ payment-info/
-│ │ ├─ purchase-confirmation/
-check
-Avoid creating subdirectories based on the type of code that lives in those directories. For example, avoid creating directories like components, directives, and services.
-
-Avoid putting so many files into one directory that it becomes hard to read or navigate. As the number of files in a directory grows, consider splitting further into additional sub-directories.
-
-One concept per file
-Prefer focusing source files on a single concept. For Angular classes specifically, this usually means one component, directive, or service per file. However, it's okay if a file contains more than one component or directive if your classes are relatively small and they tie together as part of a single concept.
-
-When in doubt, go with the approach that leads to smaller files.
-
-Dependency injection
-Prefer the inject function over constructor parameter injection
-Prefer using the inject function over injecting constructor parameters. The inject function works the same way as constructor parameter injection, but offers several style advantages:
-
-inject is generally more readable, especially when a class injects many dependencies.
-It's more syntactically straightforward to add comments to injected dependencies
-inject offers better type inference.
-When targeting ES2022+ with useDefineForClassFields, you can avoid separating field declaration and initialization when fields read on injected dependencies.
-You can refactor existing code to inject with an automatic tool.
-
-Components and directives
-Choosing component selectors
-See the Components guide for details on choosing component selectors.
-
-Naming component and directive members
-See the Components guide for details on naming input properties and naming output properties.
-
-Choosing directive selectors
-Directives should use the same application-specific prefix as your components.
-
-When using an attribute selector for a directive, use a camelCase attribute name. For example, if your application is named "MovieReel" and you build a directive that adds a tooltip to an element, you might use the selector [mrTooltip].
-
-Group Angular-specific properties before methods
-Components and directives should group Angular-specific properties together, typically near the top of the class declaration. This includes injected dependencies, inputs, outputs, and queries. Define these and other properties before the class's methods.
-
-This practice makes it easier to find the class's template APIs and dependencies.
-
-Keep components and directives focused on presentation
-Code inside your components and directives should generally relate to the UI shown on the page. For code that makes sense on its own, decoupled from the UI, prefer refactoring to other files. For example, you can factor form validation rules or data transformations into separate functions or classes.
-
-Avoid overly complex logic in templates
-Angular templates are designed to accommodate JavaScript-like expressions. You should take advantage of these expressions to capture relatively straightforward logic directly in template expressions.
-
-When the code in a template gets too complex, though, refactor logic into the TypeScript code (typically with a computed).
-
-There's no one hard-and-fast rule that determines what constitutes "complex". Use your best judgement.
-
-Use protected on class members that are only used by a component's template
-A component class's public members intrinsically define a public API that's accessible via dependency injection and queries. Prefer protected access for any members that are meant to be read from the component's template.
-
-@Component({
-  ...,
-  template: `<p>{{ fullName() }}</p>`,
-})
-export class UserProfile {
-  firstName = input();
-  lastName = input();
-// `fullName` is not part of the component's public API, but is used in the template.
-  protected fullName = computed(() => `${this.firstName()} ${this.lastName()}`);
-}
-check
-Use readonly for properties that shouldn't change
-Mark component and directive properties initialized by Angular as readonly. This includes properties initialized by input, model, output, and queries. The readonly access modifier ensures that the value set by Angular is not overwritten.
-
-@Component(/* ... */)
-export class UserProfile {
-  readonly userId = input();
-  readonly userSaved = output();
-  readonly userName = model();
-}
-check
-For components and directives that use the decorator-based @Input, @Output, and query APIs, this advice applies to output properties and queries, but not input properties.
-
-@Component(/* ... */)
-export class UserProfile {
-  @Output() readonly userSaved = new EventEmitter<void>();
-  @ViewChildren(PaymentMethod) readonly paymentMethods?: QueryList<PaymentMethod>;
-}
-check
-Prefer class and style over ngClass and ngStyle
-Prefer class and style bindings over using the NgClass and NgStyle directives.
-
-Prefer
-<div [class.admin]="isAdmin" [class.dense]="density === 'high'">
-  <div [style.color]="textColor" [style.background-color]="backgroundColor">
-    <!-- OR -->
-    <div [class]="{admin: isAdmin, dense: density === 'high'}">
-      <div [style]="{'color': textColor, 'background-color': backgroundColor}"></div>
-    </div>
-  </div>
-</div>
-check
-Avoid
-<div [ngClass]="{admin: isAdmin, dense: density === 'high'}">
-  <div [ngStyle]="{'color': textColor, 'background-color': backgroundColor}"></div>
-</div>
-check
-Both class and style bindings use a more straightforward syntax that aligns closely with standard HTML attributes. This makes your templates easier to read and understand, especially for developers familiar with basic HTML.
-
-Additionally, the NgClass and NgStyle directives incur an additional performance cost compared to the built-in class and style binding syntax.
-
-For more details, refer to the bindings guide
-
-Name event handlers for what they do, not for the triggering event
-Prefer naming event handlers for the action they perform rather than for the triggering event:
-
-Prefer
-<button (click)="saveUserData()">Save</button>
-check
-Avoid
-<button (click)="handleClick()">Save</button>
-check
-Using meaningful names like this makes it easier to tell what an event does from reading the template.
-
-For keyboard events, you can use Angular's key event modifiers with specific handler names:
-
-<textarea (keydown.control.enter)="commitNotes()" (keydown.control.space)="showSuggestions()">
-check
-Sometimes, event handling logic is especially long or complex, making it impractical to declare a single well-named handler. In these cases, it's fine to fall back to a name like 'handleKeydown' and then delegate to more specific behaviors based on the event details:
-
-@Component(/* ... */)
-class RichText {
-  handleKeydown(event: KeyboardEvent) {
-    if (event.ctrlKey) {
-      if (event.key === 'B') {
-        this.activateBold();
-      } else if (event.key === 'I') {
-        this.activateItalic();
-      }
-      // ...
-    }
-  }
-}
-check
-Keep lifecycle methods simple
-Avoid putting long or complex logic inside lifecycle hooks like ngOnInit. Instead, prefer creating well-named methods to contain that logic and then call those methods in your lifecycle hooks. Lifecycle hook names describe when they run, meaning that the code inside doesn't have a meaningful name that describes what the code inside is doing.
-
-Prefer
-ngOnInit() {
-  this.startLogging();
-  this.runBackgroundTask();
-}
-check
-Avoid
-ngOnInit() {
-  this.logger.setMode('info');
-  this.logger.monitorErrors();
-  // ...and all the rest of the code that would be unrolled from these methods.
-}
-check
-Use lifecycle hook interfaces
-Angular provides a TypeScript interface for each lifecycle method. When adding a lifecycle hook to your class, import and implement these interfaces to ensure that the methods are named correctly.
-
-import {Component, OnInit} from '@angular/core';
-@Component(/* ... */)
-export class UserProfile implements OnInit {
-  // The `OnInit` interface ensures this method is named correctly.
-  ngOnInit() {
-    /* ... */
-  }
-}
+- ALWAYS name files using lowercase hyphenated words matching the primary class identifier (`user-profile.component.ts` or `user-profile.ts` for `UserProfileComponent`).
+  Why: Guarantees cross-platform filesystem compatibility and predictable module resolution. [Lint: no]
+- ALWAYS colocate a component's TypeScript, template (`.html`), and style (`.css`/`.scss`) files under the same base name.
+  Why: Keeps component units cohesive and straightforward to locate. [Lint: no]
+- ALWAYS colocate unit test files with the code under test and name them with `.spec.ts`.
+  Why: Ensures tests remain visible alongside source code and prevents isolated, forgotten test suites. [Lint: no]
+- ALWAYS prefix component selectors with `app-` (kebab-case) and directive selectors with `app` (camelCase).
+  Why: Prevents collisions with standard HTML tags and third-party components. [Lint: yes (`@angular-eslint/component-selector`, `@angular-eslint/directive-selector`)]
+- ALWAYS suffix component classes with `Component` and directives with `Directive`.
+  Why: Disambiguates Angular constructs across symbols. [Lint: yes (`@angular-eslint/component-class-suffix`, `@angular-eslint/directive-class-suffix`)]
+- NEVER use generic filenames like `helpers.ts`, `utils.ts`, or `common.ts`; use feature- or domain-descriptive names.
+  Why: Prevents indiscriminate dumping of unrelated logic. [Lint: no]
