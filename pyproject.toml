@@ -1,3 +1,24 @@
+[project]
+name = "ribbit-platform"
+version = "0.1.0"
+requires-python = ">=3.15"
+dependencies = [
+    "email-validator>=2.2,<3",
+    "fastapi>=0.115,<1",
+    "httpx>=0.27,<1",
+    "sqlalchemy>=2.0,<3",
+    "uvicorn>=0.34,<1",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8,<10",
+    "ruff>=0.11,<1",
+]
+
+[tool.uv]
+package = false
+
 [tool.ruff]
 target-version = "py315"
 extend-exclude = ["docs", "scripts"]
@@ -31,7 +52,10 @@ ignore = ["D101", "D102", "D103", "D107", "TRY003", "SIM108"]
 unfixable = ["B"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["S101", "SIM117", "PLC0415", "N803", "PLR2004", "TRY300", "PLR0913", "TID251"]
+"tests/*" = ["S101", "SIM117", "PLC0415", "N803", "PLR2004", "TRY300", "PLR0913", "TID251", "N806", "PLR0915", "D"]
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastapi.Depends", "fastapi.params.Depends", "fastapi.Query", "fastapi.params.Query"]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 10

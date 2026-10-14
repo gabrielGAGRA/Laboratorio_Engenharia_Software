@@ -1,43 +1,73 @@
-<!-- TEMPLATE: Inject-ready guide. Replace every FILL block with target-repo facts; delete this banner when done. -->
-
 # AI Guide: Hexagonal Architecture & Package Layout
 
 ---
 
 ## Layer Map & Package Responsibilities
 
-<!-- FILL: Composition root path (e.g. app/http_bootstrap.py). Discover: search wire_app, bootstrap, or factory in app/. Keep: single sentence naming the file and wire_app function if present. -->
+**Composition root**: `app/main.py` — instancia a aplicação FastAPI, registra os sete routers via `include_router` e executa `popular_dados_iniciais()` (seed) no evento `lifespan`.
 
-### Domain Layer (app/domain/)
-- **models/**: Domain entities and value objects (identity, invariants, and state transitions live here).
-<!-- FILL: List key model modules (e.g. user_model.py, order_model.py). Discover: app/domain/models/. Keep: bullet list with brief role per file. -->
-- **repositories/**: Persistence Protocols for entity load/save contracts owned by the aggregate.
-<!-- FILL: List repository protocol modules. Discover: app/domain/repositories/. Keep: bullet list with interface purpose. -->
-- **ports/** / **policies/**: Domain-owned abstractions (clocks, pricing policies, deterministic ID generators used inside domain rules).
-<!-- FILL: List domain port/policy modules or note "omit if none". Discover: app/domain/ports/, app/domain/policies/. Keep: bullet list or omit. -->
-- **services/**: Pure domain logic, domain invariants, and calculations when behavior has no natural entity owner.
-<!-- FILL: List domain service modules. Discover: app/domain/services/. Keep: bullet list with responsibility per service. -->
-- **exceptions.py**: Domain exception hierarchy (e.g., CustomError and subclasses). Never raise HTTP/FastAPI exceptions here.
-<!-- FILL: Root exception class and key subclasses. Discover: app/domain/exceptions.py. Keep: one-line hierarchy summary. -->
+---
 
-### Application Layer (app/application/)
-- **use_cases/**: Single-responsibility use case classes implementing execute(...) (or equivalent).
-<!-- FILL: List primary use case modules. Discover: app/application/use_cases/. Keep: bullet list with orchestration role. -->
-- **ports/**: Application orchestration and external I/O Protocols (aggregate loaders, blob/file storage, publishers, gateways).
-<!-- FILL: List port modules. Discover: app/application/ports/. Keep: bullet list with port purpose. -->
-- **dtos/**: Pydantic input/output DTOs for use case boundary transfer (field-only models).
-<!-- FILL: List key DTO modules or patterns. Discover: app/application/dtos/. Keep: bullet list or note if DTOs live elsewhere. -->
+### Domain Layer (`app/domain/`)
 
-### Infrastructure Layer (app/infrastructure/)
-- **database/** (or equivalent): Adapters implementing domain repository protocols.
-<!-- FILL: List adapter classes/modules. Discover: app/infrastructure/. Keep: bullet list with protocol implemented. -->
-- **clients/** (or equivalent): Third-party API clients and blob adapters implementing application ports.
-<!-- FILL: List client/adapter modules. Discover: app/infrastructure/. Keep: bullet list with external system targeted. -->
+- **`entities.py`**: Dataclasses puras sem dependência de frameworks.
+  - `Plano`, `Usuario`, `Musica`, `Interacao`, `Playlist`, `PlaylistMusica`, `Jam`, `JamFila`, `AvaliacaoComentario`
+  - `AcaoInteracao` — `StrEnum` com valores `curtida`, `amada`, `rejeitada`
+- **`ports.py`**: Contratos abstratos (`ABC`) que o domínio exige mas não implementa:
+  - Repositórios: `UsuarioRepositoryPort`, `PlanoRepositoryPort`, `MusicaRepositoryPort`, `InteracaoRepositoryPort`, `PlaylistRepositoryPort`, `JamRepositoryPort`, `AvaliacaoRepositoryPort`
+  - Serviço externo: `ExternalMusicServicePort` (busca Spotify/iTunes, preview mp3, playback, exportação de playlist)
+- **`exceptions.py`**: Hierarquia `CustomError → DomainError | EntityNotFoundError | BusinessRuleViolationError | DuplicateEntityError | UnauthorizedError | ForbiddenError`. Nunca importar HTTP ou FastAPI aqui.
 
-### Presentation Layer (app/presentation/)
-- **routers/**: Function-based endpoint handlers (prefer DI for use cases and request context). Class-based handlers are acceptable when extending existing modules.
-<!-- FILL: List router modules and primary routes. Discover: app/presentation/routers/. Keep: bullet list with route prefix or tag. -->
-- **schemas/**: HTTP request and response DTOs.
-<!-- FILL: List key schema modules. Discover: app/presentation/schemas/. Keep: bullet list. -->
-- **formatters/**: Custom response formatters or narrative message builders when applicable.
-<!-- FILL: List formatter modules or note "omit if none". Discover: app/presentation/formatters/. Keep: bullet list or omit section. -->
+---
+
+### Application Layer (`app/application/`)
+
+Cada arquivo contém funções de caso de uso que recebem dependências injetadas no construtor. Não importam SQLAlchemy, FastAPI ou Pydantic.
+
+- `auth_use_cases.py` — cadastro (PBKDF2/HMAC-SHA256), autenticação, login admin
+- `descoberta_use_cases.py` — próxima música com trava de menor de idade (`IDADE_MINIMA_ADULTO = 18`) e filtro de gêneros bloqueados
+- `playlist_use_cases.py` — deck por parâmetros, add via swipe, listar biblioteca, exportar para Spotify; validação IDOR (playlist pertence ao usuário)
+- `perfil_use_cases.py` — perfil, plano, família (titular/dependente), estatísticas Premium, histórico e gêneros bloqueados
+- `jam_use_cases.py` — criar sala (`secrets.choice` para código), entrar, votar, pular, promover campeã de votos
+- `review_use_cases.py` — busca de músicas, publicar review (`NOTA_MINIMA=1`, `NOTA_MAXIMA=5`), feed de comunidade (top 3 dos últimos 5 dias), likes
+- `admin_use_cases.py` — dashboard financeiro (receita apenas de titulares), gestão de usuários/planos, auditoria, bloquear música (soft delete), promover admin
+
+---
+
+### Infrastructure Layer (`app/infrastructure/`)
+
+Implementa os ports do domínio. Única camada que importa SQLAlchemy.
+
+- **`database.py`**: Engine SQLAlchemy, `SessionLocal`, `get_db()` (gerador para DI). Suporta SQLite local (default) e PostgreSQL via `DATABASE_URL`.
+- **`db_models.py`**: 9 modelos ORM mapeando as tabelas: `PlanoModel`, `UsuarioModel`, `MusicaModel`, `InteracaoModel`, `PlaylistModel`, `PlaylistMusicaModel`, `JamModel`, `JamFilaModel`, `AvaliacaoComentarioModel`.
+- **`repositories.py`**: Implementações concretas dos 7 `RepositoryPort`. Responsáveis pelo mapeamento ORM ↔ Entidade de domínio.
+- **`apis_externas.py`**: `SpotifyAdapter` (busca, playback context, exportação de playlist via API REST) e `ItunesAdapter` (fallback de busca e preview mp3). Usa `httpx` com catch de `httpx.HTTPError`.
+- **`seed.py`**: `popular_dados_iniciais(db)` — verifica e insere 3 planos (Free R$0, Individual R$14,90, Família R$27,90) e 5 músicas de amostra. **Apenas para desenvolvimento local.**
+
+---
+
+### Presentation Layer (`app/presentation/`)
+
+Endpoints enxutos: recebem HTTP → validam DTO → invocam use case → retornam resposta.
+
+- **`schemas.py`**: DTOs Pydantic v2 para todas as requisições e respostas.
+- **`dependencies.py`**: Provedores de DI que instanciam repositórios + use cases via `Depends`.
+- **`routers/`**:
+  - `auth.py` — `POST /api/auth/cadastrar`, `POST /api/auth/login`
+  - `descoberta.py` — `GET /api/descoberta/proxima`, `POST /api/descoberta/interagir`
+  - `playlists.py` — `POST /api/playlists/deck`, `POST /api/playlists/{id}/swipe-add`, `GET /api/playlists`, `POST /api/playlists/{id}/exportar-spotify`
+  - `jams.py` — `POST /api/jams`, `POST /api/jams/entrar`, `GET /api/jams/{id}/estado`, `POST /api/jams/{id}/votar`, `POST /api/jams/{id}/pular`
+  - `musicas_reviews.py` — `GET /api/musicas/buscar`, `POST /api/reviews`, `GET /api/reviews/feed-top5dias`, `POST /api/reviews/{id}/like`, `GET /api/reviews/reviews-musica`
+  - `perfil.py` — perfil, planos, família, frequência anual (Premium), histórico (Premium), gêneros bloqueados (Premium)
+  - `admin.py` — dashboard, usuários, audiência, bloquear música, promover admin, planos, comentários (todos protegidos por `X-Admin-Id`)
+
+---
+
+## Layer Crossing Rules
+
+| ✅ Permitido | ❌ Proibido |
+| --- | --- |
+| `presentation` importa `application` | `domain` importar qualquer lib externa |
+| `application` importa `domain` | `application` importar SQLAlchemy ou FastAPI |
+| `infrastructure` importa `domain` (ports) | `infrastructure` importar use cases |
+| `presentation` importa `infrastructure` (via DI em `dependencies.py`) | Qualquer camada importar a superior |

@@ -4,14 +4,22 @@ description: Use when writing or editing tests - test tree layout, fakes/mocks, 
 globs: tests/**/*.py
 ---
 
-<!-- TEMPLATE: Inject-ready rule. Replace every FILL block with target-repo facts; delete this banner when done. -->
-
 # Tests
 
-| Directory | Scope |
+| Directory / File | Scope |
 | --- | --- |
-<!-- FILL: One row per tests/ subdirectory. Discover: tests/ tree. Keep: directory path + what is tested there. -->
+| `tests/test_domain.py` | Entidades e exceções do domínio puro (sem I/O) |
+| `tests/test_infrastructure.py` | Repositórios concretos contra SQLite em memória (`sqlite:///:memory:`) |
+| `tests/test_application.py` | Use cases com repositórios concretos em SQLite em memória (sem mocks) |
+| `tests/test_e2e_flow.py` | Fluxo completo via `TestClient` do FastAPI (cadastro → login → swipe → playlist → perfil) |
 
-<!-- FILL: Doubles guidance — which fakes/mocks for use-case, HTTP, and adapter tests. Discover: tests/utils/, conftest. Keep: one or two sentences. -->
+**Doubles**: Os testes usam repositórios concretos (`app/infrastructure/repositories.py`) contra um banco SQLite em memória criado no setup de cada módulo de teste — sem mocks ou fakes separados. Isso garante que repositórios e use cases sejam testados juntos com schema real.
+
+**Como rodar**:
+```bash
+uv run pytest                    # todos os testes
+uv run pytest tests/test_domain.py   # camada específica
+uv run pytest -v                 # verbose
+```
 
 Categories + isolation: `docs/llm/tests-guide.md` §5. TDD + CI policy: `docs/llm/software-engineering-rules.md` §9.
