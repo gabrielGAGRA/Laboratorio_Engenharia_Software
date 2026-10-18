@@ -1,11 +1,24 @@
 """Administration console router for catalog moderation and executive dashboard."""
 
-from typing import TYPE_CHECKING, Annotated
+from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
-from app.application.dtos.admin_dtos import UpdateSubscriptionPlanInput
-from app.application.dtos.auth_dtos import AuthenticateUserInput
+from app.application.commands import (
+    AuthenticateAdminCommand,
+    UpdateSubscriptionPlanCommand,
+)
+from app.application.use_cases.admin import (
+    BlockTrackUseCase,
+    GetAudienceReportUseCase,
+    GetExecutiveDashboardUseCase,
+    GetTopModerationReviewsUseCase,
+    ListUsersWithPlansUseCase,
+    PromoteUserToAdminUseCase,
+    UpdateSubscriptionPlanUseCase,
+    UpdateTrackExplicitFlagUseCase,
+)
+from app.application.use_cases.auth import AuthenticateAdminUseCase
 from app.presentation.dependencies import (
     get_audience_report_use_case,
     get_authenticate_admin_use_case,
@@ -32,19 +45,6 @@ from app.presentation.schemas import (
     UserResponse,
 )
 
-if TYPE_CHECKING:
-    from app.application.use_cases.admin import (
-        BlockTrackUseCase,
-        GetAudienceReportUseCase,
-        GetExecutiveDashboardUseCase,
-        GetTopModerationReviewsUseCase,
-        ListUsersWithPlansUseCase,
-        PromoteUserToAdminUseCase,
-        UpdateSubscriptionPlanUseCase,
-        UpdateTrackExplicitFlagUseCase,
-    )
-    from app.application.use_cases.auth import AuthenticateAdminUseCase
-
 router = APIRouter(prefix="/api/admin", tags=["Admin Console"])
 
 
@@ -56,7 +56,7 @@ def login_admin(
     ],
 ) -> UserResponse:
     admin = use_case.execute(
-        AuthenticateUserInput(email=req.email, password=req.password)
+        AuthenticateAdminCommand(email=req.email, password=req.password)
     )
     return UserResponse.model_validate(admin)
 
@@ -164,13 +164,13 @@ def update_plan(
         Depends(get_update_subscription_plan_use_case),
     ],
 ) -> PlanResponse:
-    input_dto = UpdateSubscriptionPlanInput(
+    command = UpdateSubscriptionPlanCommand(
         plan_id=plan_id,
         new_price=req.new_price,
         new_name=req.new_name,
         max_profiles=req.max_profiles,
     )
-    plan = use_case.execute(input_dto)
+    plan = use_case.execute(command)
     return PlanResponse.model_validate(plan)
 
 
@@ -187,3 +187,6 @@ def get_top_moderation_reviews(
 ) -> list[ReviewResponse]:
     reviews = use_case.execute()
     return [ReviewResponse.model_validate(r) for r in reviews]
+
+
+__all__ = ["router"]

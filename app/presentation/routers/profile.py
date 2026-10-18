@@ -1,10 +1,28 @@
 """User profile, subscription plans, premium, and family plan router."""
 
-from typing import TYPE_CHECKING, Annotated
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
 
-from app.application.dtos.user_dtos import UpdateProfileInput
+from app.application.commands import UpdateProfileCommand
+from app.application.use_cases.user import (
+    AddFamilyMemberUseCase,
+    CancelSubscriptionPlanUseCase,
+    ChangeSubscriptionPlanUseCase,
+    ChangeTrackInteractionUseCase,
+    DeleteUserAccountUseCase,
+    GetAnnualListeningStatsUseCase,
+    GetUserProfileUseCase,
+    LinkSpotifyAccountUseCase,
+    ListBlockedGenresUseCase,
+    ListFamilyMembersUseCase,
+    ListPlansUseCase,
+    ListUserInteractionsUseCase,
+    RemoveFamilyMemberUseCase,
+    UpdateBlockedGenresUseCase,
+    UpdateProfileUseCase,
+)
+from app.domain.models.interaction import InteractionAction
 from app.presentation.dependencies import (
     get_add_family_member_use_case,
     get_annual_stats_use_case,
@@ -37,25 +55,6 @@ from app.presentation.schemas import (
     UserResponse,
 )
 
-if TYPE_CHECKING:
-    from app.application.use_cases.user import (
-        AddFamilyMemberUseCase,
-        CancelSubscriptionPlanUseCase,
-        ChangeSubscriptionPlanUseCase,
-        ChangeTrackInteractionUseCase,
-        DeleteUserAccountUseCase,
-        GetAnnualListeningStatsUseCase,
-        GetUserProfileUseCase,
-        LinkSpotifyAccountUseCase,
-        ListBlockedGenresUseCase,
-        ListFamilyMembersUseCase,
-        ListPlansUseCase,
-        ListUserInteractionsUseCase,
-        RemoveFamilyMemberUseCase,
-        UpdateBlockedGenresUseCase,
-        UpdateProfileUseCase,
-    )
-
 router = APIRouter(tags=["Profile & Plans"])
 
 
@@ -75,7 +74,7 @@ def update_profile(
     use_case: Annotated[UpdateProfileUseCase, Depends(get_update_profile_use_case)],
 ) -> UserResponse:
     user = use_case.execute(
-        UpdateProfileInput(
+        UpdateProfileCommand(
             user_id=user_id,
             display_name=req.display_name,
             new_password=req.new_password,
@@ -166,10 +165,11 @@ def change_interaction(
         Depends(get_change_track_interaction_use_case),
     ],
 ) -> InteractionResponse:
+    action = InteractionAction(req.new_action.lower())
     interaction = use_case.execute(
         user_id=req.user_id,
         track_id=req.track_id,
-        new_action=req.new_action,
+        new_action=action,
     )
     return InteractionResponse.model_validate(interaction)
 
@@ -182,7 +182,8 @@ def list_history(
     ],
     category: Annotated[str | None, Query()] = None,
 ) -> list[InteractionResponse]:
-    items = use_case.execute(user_id=user_id, action=category)
+    action = InteractionAction(category.lower()) if category else None
+    items = use_case.execute(user_id=user_id, action=action)
     return [InteractionResponse.model_validate(i) for i in items]
 
 
@@ -203,9 +204,14 @@ def update_blocked_genres(
         UpdateBlockedGenresUseCase, Depends(get_update_blocked_genres_use_case)
     ],
 ) -> UserResponse:
+    if isinstance(req.blocked_genres, str):
+        blocked_list = [g.strip() for g in req.blocked_genres.split(",") if g.strip()]
+    else:
+        blocked_list = [str(g).strip() for g in req.blocked_genres if str(g).strip()]
+
     user = use_case.execute(
         user_id=req.user_id,
-        blocked_genres=req.blocked_genres,
+        blocked_genres=blocked_list,
     )
     return UserResponse.model_validate(user)
 
@@ -220,7 +226,7 @@ def list_family_members(
         ListFamilyMembersUseCase, Depends(get_list_family_members_use_case)
     ],
 ) -> list[UserResponse]:
-    members = use_case.execute(primary_account_id=primary_account_id)
+    members = use_case.execute(primary_user_id=primary_account_id)
     return [UserResponse.model_validate(m) for m in members]
 
 
@@ -232,7 +238,7 @@ def add_family_member(
     ],
 ) -> UserResponse:
     dependent = use_case.execute(
-        primary_account_id=req.primary_account_id,
+        primary_user_id=req.primary_account_id,
         dependent_user_id=req.dependent_user_id,
     )
     return UserResponse.model_validate(dependent)
@@ -247,7 +253,10 @@ def remove_family_member(
     ],
 ) -> UserResponse:
     unlinked = use_case.execute(
-        primary_account_id=primary_account_id,
-        member_id=member_id,
+        primary_user_id=primary_account_id,
+        member_user_id=member_id,
     )
     return UserResponse.model_validate(unlinked)
+
+
+__all__ = ["router"]

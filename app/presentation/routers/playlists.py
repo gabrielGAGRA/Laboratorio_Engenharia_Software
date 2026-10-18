@@ -1,12 +1,18 @@
 """Playlist deck, swipe-add, and export router."""
 
-from typing import TYPE_CHECKING, Annotated
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, status
 
-from app.application.dtos.playlist_dtos import (
-    AddTrackToPlaylistInput,
-    CreateDeckPlaylistInput,
+from app.application.commands import (
+    AddTrackToPlaylistCommand,
+    CreateDeckPlaylistCommand,
+)
+from app.application.use_cases.playlist import (
+    AddTrackToPlaylistUseCase,
+    CreateDeckPlaylistUseCase,
+    ExportPlaylistToSpotifyUseCase,
+    ListUserPlaylistsUseCase,
 )
 from app.presentation.dependencies import (
     get_add_track_to_playlist_use_case,
@@ -21,14 +27,6 @@ from app.presentation.schemas import (
     SwipeAddTrackRequest,
 )
 
-if TYPE_CHECKING:
-    from app.application.use_cases.playlist import (
-        AddTrackToPlaylistUseCase,
-        CreateDeckPlaylistUseCase,
-        ExportPlaylistToSpotifyUseCase,
-        ListUserPlaylistsUseCase,
-    )
-
 router = APIRouter(prefix="/api/playlists", tags=["Playlists"])
 
 
@@ -42,7 +40,7 @@ def create_deck_playlist(
     ],
 ) -> PlaylistResponse:
     playlist = use_case.execute(
-        CreateDeckPlaylistInput(
+        CreateDeckPlaylistCommand(
             user_id=req.user_id,
             name=req.name,
             duration_minutes=req.duration_minutes,
@@ -66,7 +64,7 @@ def swipe_add_track(
     ],
 ) -> ActionSuccessResponse:
     use_case.execute(
-        AddTrackToPlaylistInput(
+        AddTrackToPlaylistCommand(
             playlist_id=playlist_id,
             track_id=req.track_id,
             user_id=user_id,
@@ -100,3 +98,6 @@ def export_playlist_to_spotify(
         playlist_id=playlist_id,
     )
     return PlaylistResponse.model_validate(playlist)
+
+
+__all__ = ["router"]

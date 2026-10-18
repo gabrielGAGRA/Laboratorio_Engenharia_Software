@@ -1,10 +1,20 @@
 """Track catalog search and community reviews router."""
 
-from typing import TYPE_CHECKING, Annotated
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, status
 
-from app.application.dtos.review_dtos import PublishReviewInput, SearchTracksInput
+from app.application.commands import (
+    PublishReviewCommand,
+    SearchTracksCommand,
+)
+from app.application.use_cases.review import (
+    GetCommunityFeedUseCase,
+    GetTrackReviewsUseCase,
+    LikeReviewCommentUseCase,
+    PublishReviewUseCase,
+    SearchTracksUseCase,
+)
 from app.presentation.dependencies import (
     get_community_feed_use_case,
     get_like_review_comment_use_case,
@@ -19,15 +29,6 @@ from app.presentation.schemas import (
     TrackSearchQuery,
 )
 
-if TYPE_CHECKING:
-    from app.application.use_cases.review import (
-        GetCommunityFeedUseCase,
-        GetTrackReviewsUseCase,
-        LikeReviewCommentUseCase,
-        PublishReviewUseCase,
-        SearchTracksUseCase,
-    )
-
 router = APIRouter(tags=["Tracks & Reviews"])
 
 
@@ -38,7 +39,7 @@ def search_tracks(
     use_case: Annotated[SearchTracksUseCase, Depends(get_search_tracks_use_case)],
 ) -> list[TrackResponse]:
     tracks = use_case.execute(
-        SearchTracksInput(
+        SearchTracksCommand(
             user_id=user_id,
             query=query.query,
             artist=query.artist,
@@ -62,7 +63,7 @@ def publish_review(
     use_case: Annotated[PublishReviewUseCase, Depends(get_publish_review_use_case)],
 ) -> ReviewResponse:
     review = use_case.execute(
-        PublishReviewInput(
+        PublishReviewCommand(
             user_id=req.user_id,
             track_id=req.track_id,
             rating=req.rating,
@@ -98,3 +99,6 @@ def get_track_reviews(
 ) -> list[ReviewResponse]:
     reviews = use_case.execute(track_id=track_id)
     return [ReviewResponse.model_validate(r) for r in reviews]
+
+
+__all__ = ["router"]

@@ -1,13 +1,21 @@
 """Collaborative Jam session and queue voting router."""
 
-from typing import TYPE_CHECKING, Annotated
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, status
 
-from app.application.dtos.jam_dtos import (
-    CreateJamInput,
-    VoteJamTrackInput,
-    VoteSkipJamTrackInput,
+from app.application.commands import (
+    CreateJamCommand,
+    VoteJamTrackCommand,
+    VoteSkipJamTrackCommand,
+)
+from app.application.use_cases.jam import (
+    AdvanceJamPlaybackUseCase,
+    CreateJamUseCase,
+    GetJamStateUseCase,
+    JoinJamUseCase,
+    VoteJamTrackUseCase,
+    VoteSkipJamTrackUseCase,
 )
 from app.presentation.dependencies import (
     get_advance_jam_playback_use_case,
@@ -28,16 +36,6 @@ from app.presentation.schemas import (
     VoteJamTrackRequest,
 )
 
-if TYPE_CHECKING:
-    from app.application.use_cases.jam import (
-        AdvanceJamPlaybackUseCase,
-        CreateJamUseCase,
-        GetJamStateUseCase,
-        JoinJamUseCase,
-        VoteJamTrackUseCase,
-        VoteSkipJamTrackUseCase,
-    )
-
 router = APIRouter(prefix="/api/jams", tags=["Collaborative Jams"])
 
 
@@ -47,7 +45,7 @@ def create_jam(
     use_case: Annotated[CreateJamUseCase, Depends(get_create_jam_use_case)],
 ) -> JamResponse:
     jam = use_case.execute(
-        CreateJamInput(
+        CreateJamCommand(
             host_user_id=req.host_user_id,
             room_name=req.room_name,
         )
@@ -81,7 +79,7 @@ def vote_jam_track(
     use_case: Annotated[VoteJamTrackUseCase, Depends(get_vote_jam_track_use_case)],
 ) -> JamQueueItemResponse:
     queue_item = use_case.execute(
-        VoteJamTrackInput(
+        VoteJamTrackCommand(
             jam_id=jam_id,
             track_id=req.track_id,
             user_id=req.user_id,
@@ -100,7 +98,7 @@ def skip_jam_track(
     ],
 ) -> ActionSuccessResponse:
     use_case.execute(
-        VoteSkipJamTrackInput(
+        VoteSkipJamTrackCommand(
             jam_id=jam_id,
             track_id=req.track_id,
             user_id=req.user_id,
@@ -122,3 +120,6 @@ def advance_jam_playback(
         requester_user_id=requester_user_id,
     )
     return JamResponse.model_validate(jam)
+
+
+__all__ = ["router"]

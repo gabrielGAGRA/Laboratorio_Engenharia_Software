@@ -1,10 +1,17 @@
 """Authentication and registration router."""
 
-from typing import TYPE_CHECKING, Annotated
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, status
 
-from app.application.dtos.auth_dtos import AuthenticateUserInput, RegisterUserInput
+from app.application.commands import (
+    AuthenticateUserCommand,
+    RegisterUserCommand,
+)
+from app.application.use_cases.auth import (
+    AuthenticateUserUseCase,
+    RegisterUserUseCase,
+)
 from app.presentation.dependencies import (
     get_authenticate_user_use_case,
     get_register_user_use_case,
@@ -14,12 +21,6 @@ from app.presentation.schemas import (
     RegisterUserRequest,
     UserResponse,
 )
-
-if TYPE_CHECKING:
-    from app.application.use_cases.auth import (
-        AuthenticateUserUseCase,
-        RegisterUserUseCase,
-    )
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
@@ -34,7 +35,7 @@ def register(
     use_case: Annotated[RegisterUserUseCase, Depends(get_register_user_use_case)],
 ) -> UserResponse:
     user = use_case.execute(
-        RegisterUserInput(
+        RegisterUserCommand(
             email=req.email,
             password=req.password,
             display_name=req.display_name,
@@ -53,6 +54,9 @@ def login(
     ],
 ) -> UserResponse:
     user = use_case.execute(
-        AuthenticateUserInput(email=req.email, password=req.password)
+        AuthenticateUserCommand(email=req.email, password=req.password)
     )
     return UserResponse.model_validate(user)
+
+
+__all__ = ["router"]

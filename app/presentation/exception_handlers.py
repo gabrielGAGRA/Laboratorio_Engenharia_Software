@@ -31,16 +31,21 @@ def resolve_status_code(exc: CustomError) -> int:
     return status.HTTP_400_BAD_REQUEST
 
 
-async def domain_error_handler(_request: Request, exc: CustomError) -> JSONResponse:
+async def domain_error_handler(_request: Request, exc: Exception) -> JSONResponse:
     """Unified handler that maps any CustomError to its corresponding HTTP response."""
-    status_code = resolve_status_code(exc)
+    if isinstance(exc, CustomError):
+        status_code = resolve_status_code(exc)
+        return JSONResponse(
+            status_code=status_code,
+            content={
+                "error": exc.name,
+                "message": exc.message,
+                "details": exc.details,
+            },
+        )
     return JSONResponse(
-        status_code=status_code,
-        content={
-            "error": exc.name,
-            "message": exc.message,
-            "details": exc.details,
-        },
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={"error": "InternalServerError", "message": str(exc)},
     )
 
 
