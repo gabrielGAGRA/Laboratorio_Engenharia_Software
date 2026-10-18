@@ -1,73 +1,71 @@
-# AI Guide: Hexagonal Architecture & Package Layout
+# AI Guide: Hexagonal Architecture and Package Layout
 
----
+## Layer map
 
-## Layer Map & Package Responsibilities
+**Composition root — `app/main.py`**: creates the FastAPI application, registers routers,
+initializes database tables and additive schema migrations, and loads development seed data.
+The local seed is disabled when `RIBBIT_ENV=production`.
 
-**Composition root**: `app/main.py` — instancia a aplicação FastAPI, registra os sete routers via `include_router` e executa `popular_dados_iniciais()` (seed) no evento `lifespan`.
+### Domain (`app/domain/`)
 
----
+- `entities.py`: framework-independent dataclasses for plans, users, music, interactions,
+  playlists, Jams, and reviews.
+- `ports.py`: abstract repository and external-service contracts.
+- This layer must not import SQLAlchemy, FastAPI, or Pydantic. Business exceptions and shared
+  application constants are kept in `app/application/`.
 
-### Domain Layer (`app/domain/`)
+### Application (`app/application/`)
 
-- **`entities.py`**: Dataclasses puras sem dependência de frameworks.
-  - `Plano`, `Usuario`, `Musica`, `Interacao`, `Playlist`, `PlaylistMusica`, `Jam`, `JamFila`, `AvaliacaoComentario`
-  - `AcaoInteracao` — `StrEnum` com valores `curtida`, `amada`, `rejeitada`
-- **`ports.py`**: Contratos abstratos (`ABC`) que o domínio exige mas não implementa:
-  - Repositórios: `UsuarioRepositoryPort`, `PlanoRepositoryPort`, `MusicaRepositoryPort`, `InteracaoRepositoryPort`, `PlaylistRepositoryPort`, `JamRepositoryPort`, `AvaliacaoRepositoryPort`
-  - Serviço externo: `ExternalMusicServicePort` (busca Spotify/iTunes, preview mp3, playback, exportação de playlist)
-- **`exceptions.py`**: Hierarquia `CustomError → DomainError | EntityNotFoundError | BusinessRuleViolationError | DuplicateEntityError | UnauthorizedError | ForbiddenError`. Nunca importar HTTP ou FastAPI aqui.
+Use cases depend on domain entities and ports, not on web or persistence frameworks.
 
----
+- `auth_use_cases.py`: registration age gate, password hashing, and common user/admin login.
+- `descoberta_use_cases.py`: unseen-track discovery with age and blocked-genre filters.
+- `playlist_use_cases.py`: playlist ownership, deck generation, duration limits, track saving,
+  and Spotify export orchestration.
+- `perfil_use_cases.py`: plans, Premium permissions, profile management, and Family dependents.
+- `jam_use_cases.py`: room creation/membership, queue scoring, superlike limits, unique skip
+  votes, automatic advancement, and host termination.
+- `review_use_cases.py`: search, song reviews, community feed, and review likes.
+- `admin_use_cases.py`: admin-only audience, plan, administrator, and blocked-music operations.
+- `constants.py`, `exceptions.py`: application-level invariants and errors mapped to HTTP by
+  the composition root.
 
-### Application Layer (`app/application/`)
+### Infrastructure (`app/infrastructure/`)
 
-Cada arquivo contém funções de caso de uso que recebem dependências injetadas no construtor. Não importam SQLAlchemy, FastAPI ou Pydantic.
+- `database.py`: SQLAlchemy engine and session dependency; SQLite foreign-key enforcement is
+  enabled for local persistence.
+- `db_models.py`: ORM tables, including Jam participants/votes and unique review likes.
+- `repositories.py`: implementations of domain ports and ORM/domain conversions.
+- `migrations.py`: additive column migrations for existing installations.
+- `security.py`: signed expiring Bearer tokens.
+- `apis_externas.py`: iTunes preview lookup and Spotify mock/preparation adapter.
+- `seed.py`: idempotent local plans, sample catalog, and admin account.
 
-- `auth_use_cases.py` — cadastro (PBKDF2/HMAC-SHA256), autenticação, login admin
-- `descoberta_use_cases.py` — próxima música com trava de menor de idade (`IDADE_MINIMA_ADULTO = 18`) e filtro de gêneros bloqueados
-- `playlist_use_cases.py` — deck por parâmetros, add via swipe, listar biblioteca, exportar para Spotify; validação IDOR (playlist pertence ao usuário)
-- `perfil_use_cases.py` — perfil, plano, família (titular/dependente), estatísticas Premium, histórico e gêneros bloqueados
-- `jam_use_cases.py` — criar sala (`secrets.choice` para código), entrar, votar, pular, promover campeã de votos
-- `review_use_cases.py` — busca de músicas, publicar review (`NOTA_MINIMA=1`, `NOTA_MAXIMA=5`), feed de comunidade (top 3 dos últimos 5 dias), likes
-- `admin_use_cases.py` — dashboard financeiro (receita apenas de titulares), gestão de usuários/planos, auditoria, bloquear música (soft delete), promover admin
+### Presentation (`app/presentation/`)
 
----
+- `schemas.py`: Pydantic request and response contracts.
+- `dependencies.py`: dependency injection, Bearer identity resolution, and use case wiring.
+- `routers/`: HTTP endpoints for authentication, discovery, playlists, Jams, reviews, profile,
+  and administration. Routes derive user identity from the token, not from a client-provided
+  `usuario_id`.
 
-### Infrastructure Layer (`app/infrastructure/`)
+## Security and business boundaries
 
-Implementa os ports do domínio. Única camada que importa SQLAlchemy.
+- Direct sign-up is limited to adults. Creating a minor is supported only for a Family-plan
+  titular adding a dependent.
+- Premium gates cover profile statistics, changing an existing interaction, categorized
+  interaction history, and blocked-genre management.
+- Admin operations require both a valid Bearer token and `is_admin == true`.
+- Content filters for age and blocked genres apply consistently to discovery, playlist decks
+  and additions, and Jam decks/queue interactions.
+- Jam queue skipping is vote-driven only. The host may end the room but has no manual skip
+  operation.
+- Repositories enforce resource ownership where user-specific data is modified.
 
-- **`database.py`**: Engine SQLAlchemy, `SessionLocal`, `get_db()` (gerador para DI). Suporta SQLite local (default) e PostgreSQL via `DATABASE_URL`.
-- **`db_models.py`**: 9 modelos ORM mapeando as tabelas: `PlanoModel`, `UsuarioModel`, `MusicaModel`, `InteracaoModel`, `PlaylistModel`, `PlaylistMusicaModel`, `JamModel`, `JamFilaModel`, `AvaliacaoComentarioModel`.
-- **`repositories.py`**: Implementações concretas dos 7 `RepositoryPort`. Responsáveis pelo mapeamento ORM ↔ Entidade de domínio.
-- **`apis_externas.py`**: `SpotifyAdapter` (busca, playback context, exportação de playlist via API REST) e `ItunesAdapter` (fallback de busca e preview mp3). Usa `httpx` com catch de `httpx.HTTPError`.
-- **`seed.py`**: `popular_dados_iniciais(db)` — verifica e insere 3 planos (Free R$0, Individual R$14,90, Família R$27,90) e 5 músicas de amostra. **Apenas para desenvolvimento local.**
+## Configuration and local execution
 
----
-
-### Presentation Layer (`app/presentation/`)
-
-Endpoints enxutos: recebem HTTP → validam DTO → invocam use case → retornam resposta.
-
-- **`schemas.py`**: DTOs Pydantic v2 para todas as requisições e respostas.
-- **`dependencies.py`**: Provedores de DI que instanciam repositórios + use cases via `Depends`.
-- **`routers/`**:
-  - `auth.py` — `POST /api/auth/cadastrar`, `POST /api/auth/login`
-  - `descoberta.py` — `GET /api/descoberta/proxima`, `POST /api/descoberta/interagir`
-  - `playlists.py` — `POST /api/playlists/deck`, `POST /api/playlists/{id}/swipe-add`, `GET /api/playlists`, `POST /api/playlists/{id}/exportar-spotify`
-  - `jams.py` — `POST /api/jams`, `POST /api/jams/entrar`, `GET /api/jams/{id}/estado`, `POST /api/jams/{id}/votar`, `POST /api/jams/{id}/pular`
-  - `musicas_reviews.py` — `GET /api/musicas/buscar`, `POST /api/reviews`, `GET /api/reviews/feed-top5dias`, `POST /api/reviews/{id}/like`, `GET /api/reviews/reviews-musica`
-  - `perfil.py` — perfil, planos, família, frequência anual (Premium), histórico (Premium), gêneros bloqueados (Premium)
-  - `admin.py` — dashboard, usuários, audiência, bloquear música, promover admin, planos, comentários (todos protegidos por `X-Admin-Id`)
-
----
-
-## Layer Crossing Rules
-
-| ✅ Permitido | ❌ Proibido |
-| --- | --- |
-| `presentation` importa `application` | `domain` importar qualquer lib externa |
-| `application` importa `domain` | `application` importar SQLAlchemy ou FastAPI |
-| `infrastructure` importa `domain` (ports) | `infrastructure` importar use cases |
-| `presentation` importa `infrastructure` (via DI em `dependencies.py`) | Qualquer camada importar a superior |
+- `DATABASE_URL` selects the database; SQLite is the default and PostgreSQL is supported.
+- `RIBBIT_SECRET_KEY` must be configured with a persistent random secret in production.
+- `RIBBIT_ADMIN_EMAIL` and `RIBBIT_ADMIN_PASSWORD` override local development seed credentials.
+- Run locally with `uv sync` and `uv run uvicorn app.main:app --reload`; run tests with
+  `uv run pytest`.

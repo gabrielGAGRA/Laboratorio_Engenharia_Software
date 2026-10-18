@@ -1,10 +1,10 @@
-"""Domain exception hierarchy. Pure Python, no HTTP or transport semantics."""
+"""Application errors mapped to HTTP responses by the presentation layer."""
 
 from typing import Any
 
 
 class CustomError(Exception):
-    """Root domain exception."""
+    """Root application exception."""
 
     def __init__(
         self,
@@ -23,15 +23,15 @@ class DomainError(CustomError):
 
 
 class EntityNotFoundError(DomainError):
-    """Raised when a requested domain entity does not exist."""
+    """Raised when a requested entity does not exist."""
 
 
 class BusinessRuleViolationError(DomainError):
-    """Raised when an operation violates a domain invariant or business rule."""
+    """Raised when an operation violates a business rule."""
 
 
 class DuplicateEntityError(DomainError):
-    """Raised when attempting to create an entity that already exists."""
+    """Raised when an entity already exists."""
 
 
 class UnauthorizedError(DomainError):
@@ -39,4 +39,4 @@ class UnauthorizedError(DomainError):
 
 
 class ForbiddenError(DomainError):
-    """Raised when user permissions or subscription level are insufficient."""
+    """Raised when the user lacks permission for an operation."""

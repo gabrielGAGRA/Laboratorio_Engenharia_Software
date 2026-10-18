@@ -3,15 +3,16 @@
 import hashlib
 import hmac
 import os
+from datetime import date
 
-from app.domain.entities import Usuario
-from app.domain.exceptions import (
+from app.application.exceptions import (
     BusinessRuleViolationError,
     DuplicateEntityError,
     EntityNotFoundError,
     ForbiddenError,
     UnauthorizedError,
 )
+from app.domain.entities import Usuario
 from app.domain.ports import PlanoRepositoryPort, UsuarioRepositoryPort
 
 
@@ -52,16 +53,36 @@ class AuthUseCases:
         email: str,
         senha: str,
         nome_exibicao: str,
-        idade: int,
+        idade: int | None = None,
         plano_id: int | None = None,
+        data_nascimento: date | None = None,
     ) -> Usuario:
         """Registra novo usuário com validações de unicidade e plano."""
+        email = email.strip().lower()
         existente = self.usuario_repo.buscar_por_email(email)
         if existente:
             raise DuplicateEntityError(f"E-mail {email} já está em uso.")
 
-        if idade < 0:
-            raise BusinessRuleViolationError("Idade deve ser maior ou igual a zero.")
+        if data_nascimento:
+            hoje = date.today()
+            if data_nascimento > hoje:
+                raise BusinessRuleViolationError(
+                    "Data de nascimento não pode estar no futuro."
+                )
+            idade = (
+                hoje.year
+                - data_nascimento.year
+                - (
+                    (hoje.month, hoje.day)
+                    < (data_nascimento.month, data_nascimento.day)
+                )
+            )
+        if idade is None or idade < 0:
+            raise BusinessRuleViolationError("Data de nascimento inválida.")
+        if Usuario.idade_indica_menor(idade):
+            raise BusinessRuleViolationError(
+                "Cadastro direto permitido apenas para maiores de 18 anos."
+            )
 
         if plano_id is None:
             plano_free = self.plano_repo.buscar_por_nome("Free")
@@ -76,12 +97,13 @@ class AuthUseCases:
         senha_hash = hash_password(senha)
         novo_usuario = Usuario(
             usuario_id=None,
-            email=email.strip().lower(),
+            email=email,
             senha_hash=senha_hash,
             nome_exibicao=nome_exibicao.strip(),
             idade=idade,
             plano_id=plano_id,
             is_admin=False,
+            data_nascimento=data_nascimento,
         )
         return self.usuario_repo.salvar(novo_usuario)
 

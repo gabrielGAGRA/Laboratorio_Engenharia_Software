@@ -1,123 +1,100 @@
-# AI Guide: Domain Invariants, API Contract, and External Integration
+# Backend API and Domain Rules
 
----
+## Authentication and request identity
 
-## 1. Request Context & Routing
+- `POST /api/auth/cadastrar` accepts name, e-mail, password, and date of birth. Direct registration rejects anyone under 18.
+- `POST /api/auth/login` uses the same flow for regular and administrator accounts and returns a signed Bearer token.
+- Protected user routes derive the account ID from `Authorization: Bearer <token>`; clients must not send a trusted user ID.
+- Administrator routes additionally require the authenticated account to have `is_admin == true`.
+- Set `RIBBIT_SECRET_KEY` to a persistent random secret in production. Production startup fails if it is missing.
+- Local development seeds `admin@ribbit.example.com` with password `RibbitLocal2026!`. Override these with `RIBBIT_ADMIN_EMAIL` and `RIBBIT_ADMIN_PASSWORD`; the local seed is disabled when `RIBBIT_ENV=production`.
 
-Rotas registradas sob o prefixo `/api`:
+## Routes
 
-- `POST /api/auth/cadastrar` — cria conta; corpo: `CadastrarUsuarioRequest` (email, senha, nome, idade, plano_id)
-- `POST /api/auth/login` — autentica; retorna `UsuarioResponse` com `usuario_id`
-- `GET /api/descoberta/proxima?usuario_id={id}` — próxima música para swipe
-- `POST /api/descoberta/interagir` — registra curtida/amada/rejeitada
-- `POST /api/playlists/deck` — cria playlist por parâmetros (duração, vibe, época, país, gênero, artistas)
-- `POST /api/playlists/{id}/swipe-add?usuario_id={id}` — adiciona música via swipe a uma playlist
-- `GET /api/playlists` — lista playlists do usuário
-- `POST /api/playlists/{id}/exportar-spotify` — exporta para Spotify
-- `POST /api/jams` — cria sala Jam
-- `POST /api/jams/entrar` — entra em sala por código
-- `GET /api/jams/{id}/estado?usuario_id={id}` — estado atual da jam (faixas restritas são ocultadas para menores)
-- `POST /api/jams/{id}/votar` — vota em uma música da fila; corpo inclui `usuario_id`
-- `POST /api/jams/{id}/pular` — vota para pular música; corpo inclui `usuario_id`
-- `GET /api/musicas/buscar?usuario_id={id}` — busca por artista, álbum, gênero, ano e respeita restrições etárias
-- `POST /api/reviews` — publica review (nota 1–5 + texto)
-- `GET /api/reviews/feed-top5dias` — top 3 reviews com mais likes nos últimos 5 dias
-- `POST /api/reviews/{id}/like` — dá like em um comentário
-- `GET /api/reviews/reviews-musica` — reviews de uma música específica
-- `GET /api/perfil/me`, `PUT /api/perfil/me` — perfil do usuário logado
-- `POST /api/perfil/vincular-spotify` — vincula conta Spotify
-- `GET /api/planos`, `POST /api/perfil/plano`, `DELETE /api/perfil/plano` — gestão de assinatura
-- `DELETE /api/perfil/conta` — exclusão de conta
-- `GET /api/perfil/frequencia` _(Premium)_ — dashboard anual (42h, gêneros/artistas favoritos)
-- `PUT /api/perfil/interacao` _(Premium)_ — muda tipo de interação (curtida ↔ amada ↔ rejeitada)
-- `GET /api/perfil/historico` _(Premium)_ — histórico completo por categoria
-- `GET/PUT /api/perfil/generos-bloqueados` _(Premium)_ — edita gêneros bloqueados
-- `GET /api/perfil/familia/membros`, `POST`, `DELETE /{membro_id}` — gestão de família (Titular)
-- `GET /api/admin/dashboard` — receita líquida por plano
-- `GET /api/admin/usuarios` — listagem de usuários
-- `GET /api/admin/audiencia` — relatório de audiência
-- `POST /api/admin/musicas/{id}/bloquear` — soft delete (`is_deleted = True`)
-- `PUT /api/admin/musicas/{id}/restricao-menores` — define `bloqueado_para_menores` com corpo `{"bloqueado_para_menores": true|false}`
-- `PUT /api/admin/usuarios/{id}/promover-admin` — promove usuário a admin
-- `PUT /api/admin/planos/{id}` — atualiza plano existente
-- `GET /api/admin/comentarios` — top comentários
+### Authentication and plans
 
-**Identity & Context nos payloads**:
-- Os endpoints de usuário recebem `usuario_id` em query ou no corpo, conforme cada rota; esse ID é contexto informado pelo cliente, não uma sessão autenticada.
-- `X-Admin-Id` (header) — identifica o admin; obrigatório nas rotas administrativas protegidas (exceto login).
-- Campos de corpo: validados via DTOs Pydantic em `app/presentation/schemas.py`.
+- `POST /api/auth/cadastrar`, `POST /api/auth/login`
+- `GET /api/planos`, `POST /api/perfil/plano`, `DELETE /api/perfil/plano`
 
-**Headers para APIs externas**:
-- Spotify: `Authorization: Bearer <token>` obtido via Client Credentials; variáveis `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET`
-- iTunes: nenhum header de autenticação (API pública)
+### Discovery and playlists
 
----
+- `GET /api/descoberta/proxima`, `POST /api/descoberta/interagir`
+- `GET /api/playlists`, `POST /api/playlists/deck`
+- `GET /api/playlists/{id}/deck`, `POST /api/playlists/{id}/swipe-add`
+- `GET /api/playlists/{id}`, `DELETE /api/playlists/{id}`
+- `DELETE /api/playlists/{id}/musicas/{musica_id}`
+- `POST /api/playlists/{id}/exportar-spotify` (mock adapter)
 
-## 2. Domain Validation Invariants
+### Jams
 
-### Trava de Menor de Idade
-- `IDADE_MINIMA_ADULTO = 18` (constante em `descoberta_use_cases.py`)
-- Músicas com `bloqueado_para_menores = True` são filtradas quando `usuario.idade < 18`
-- Aplicada na descoberta, busca do catálogo, geração e adição manual a playlists, e inclusão/voto de músicas na fila de Jams
+- `POST /api/jams`, `POST /api/jams/entrar`
+- `GET /api/jams/{id}/estado`, `POST /api/jams/{id}/votar-pular`
+- `POST /api/jams/{id}/curtir-fila`, `GET /api/jams/{id}/deck-adicionar`
+- `POST /api/jams/{id}/interagir-deck`, `POST /api/jams/{id}/encerrar`
 
-### Gêneros Bloqueados
-- `usuario.generos_bloqueados: list[str]` — lista de gêneros que o usuário não quer ver
-- Filtrado em `obter_proxima_musica_swipe` e `criar_deck_playlist_por_parametros`
+Playlist and Jam suggestion endpoints return cursor-paginated objects:
+`{"items": [...], "next_cursor": 123, "has_more": true}`. Requests accept `limite`
+(default 20, maximum 100) and `cursor_id` (the previous page's `next_cursor`). The playlist
+creation endpoint creates an empty playlist; fetch suggestions from its `/deck` route.
 
-### Validação de Plano
-- Premium obrigatório: `obter_frequencia_anual`, `trocar_interacao_musica`, `obter_historico_por_categoria`, `editar_generos_bloqueados`
-- Família: `adicionar_membro_familia` valida `plano.max_perfis > 1` e conta dependentes já vinculados
-- Free: plano padrão retornado ao cancelar (`cancelar_plano_assinatura`)
+### Reviews and search
 
-### Integridade de Playlist (IDOR)
-- `playlist_use_cases.py` valida `playlist.usuario_id == usuario_id` antes de qualquer escrita
+- `GET /api/reviews/ultimas-interagidas`, `GET /api/reviews/feed-top5dias`
+- `POST /api/reviews/{id}/like`, `POST /api/reviews/{musica_id}/curtir-busca`
+- `GET /api/reviews/musica/{musica_id}`, `POST /api/reviews`
+- `DELETE /api/reviews/{review_id}`, `GET /api/musicas/buscar`
 
-### Reviews
-- `NOTA_MINIMA = 1`, `NOTA_MAXIMA = 5` — constantes em `review_use_cases.py`
-- `obter_reviews_por_musica` verifica `musica.is_deleted` antes de retornar
+### Profile and family
 
-### Soft Delete de Músicas
-- `musica.is_deleted = True` oculta a faixa de buscas, descobertas e playlists novas
-- O registro permanece nos históricos de interação para integridade de auditoria
+- `GET /api/perfil/me`, `PUT /api/perfil/me`
+- `POST /api/perfil/vincular-spotify`, `DELETE /api/perfil/conta`
+- `GET /api/perfil/interacoes`, `PUT /api/perfil/interacao`
+- `GET /api/perfil/dash`, `GET/PUT /api/perfil/generos-bloqueados`
+- `GET/POST /api/perfil/familia/membros`
+- `DELETE /api/perfil/familia/membros/{membro_id}`
 
-### Violation Handling
+Family membership management is restricted to the titular of a Family plan. Dependents under
+18 can only be created through the family-member route.
 
-- Qualquer violação lança subclasse de `CustomError` (`app/domain/exceptions.py`)
-- `app/main.py` tem exception handlers globais que mapeiam cada tipo para o status HTTP correspondente:
-  - `EntityNotFoundError` → 404
-  - `BusinessRuleViolationError` → 400
-  - `DuplicateEntityError` → 409
-  - `UnauthorizedError` → 401
-  - `ForbiddenError` → 403
+### Administration
 
----
+- `GET /api/admin/dashboard`, `GET /api/admin/audiencia`
+- `GET /api/admin/administradores`, `PUT /api/admin/administradores/{id}`
+- `GET /api/admin/musicas-bloqueadas`, `PUT /api/admin/musicas/{id}/bloquear`
+- `GET /api/admin/planos`, `PUT /api/admin/planos/{id}`
 
-## 3. External I/O & Path Rules
+## Business invariants
 
-**Spotify REST API** (`app/infrastructure/apis_externas.py`):
-- Busca: `GET https://api.spotify.com/v1/search?q=...&type=track`
-- Playback context: `GET https://api.spotify.com/v1/tracks/{id}`
-- Exportação: `POST https://api.spotify.com/v1/users/{user_id}/playlists` + `POST .../tracks`
-- Token via Client Credentials Flow (sem interação do usuário)
+- Discovery, playlist decks, playlist additions, Jam suggestions, and Jam queue actions exclude
+  deleted music, music blocked for minors, and genres blocked by the requesting user.
+- Playlist and Jam decks omit tracks the requesting user previously rejected. Playlist decks
+  return paginated candidates that fit the remaining duration; adding a track enforces the
+  actual playlist duration limit. Jam free-source decks are paginated from the catalog.
+- Blocked genres affect discovery and playlist/Jam recommendations, but not catalog search or
+  save/review actions in `Músicas & Reviews`. Age restrictions still apply there.
+- Users younger than 18 are only allowed as dependent profiles in a Family plan.
+- Premium-only capabilities are statistics (`/perfil/dash`), editing existing interactions,
+  interaction history, and blocked-genre management.
+- A Jam awards 1 point for a like and 2 for a superlike, subject to its configured superlike
+  limit. Skip votes are unique per participant and current track; reaching the vote target
+  advances the queue automatically. The host can end a Jam but cannot force-skip a track.
+- Reviews can be deleted only by their author. Review likes are unique per user and review.
+- User-controlled resource writes verify ownership before changing playlists, reviews, or Jam
+  membership.
 
-**iTunes Search API**:
-- Busca fallback: `GET https://itunes.apple.com/search?term=...&entity=song`
-- Preview mp3: campo `previewUrl` no resultado — salvo em `musica.itunes_preview_url`
+## Layer boundaries
 
----
+- `app/domain/` contains framework-independent dataclasses and ABC ports only.
+- `app/application/` contains use cases, business rules, constants, and application exceptions.
+- `app/infrastructure/` contains SQLAlchemy models, repositories, migrations, security, and
+  external-service adapters.
+- `app/presentation/` contains Pydantic schemas, HTTP routers, and dependency wiring.
 
-## 4. Execution / Isolation
+## Persistence and external services
 
-- Banco padrão: SQLite (`sqlite:///./ribbit_local.db`) — sem configuração necessária localmente
-- Banco produção: PostgreSQL via `DATABASE_URL` env var
-- Testes usam `sqlite:///:memory:` — banco recriado a cada execução de teste
-- `seed.py` é idempotente: verifica existência antes de inserir
-
----
-
-## 5. Execution Result & Message Formatting
-
-- Use cases retornam entidades de domínio (`dataclasses`) ou primitivos Python
-- Routers convertem para DTOs Pydantic de resposta antes de retornar ao cliente
-- Erros retornam `{"erro": "<tipo>", "mensagem": "<mensagem>", "detalhes": {}}` com o status HTTP correspondente
-- Nenhum use case retorna objetos FastAPI `Response` ou `JSONResponse` diretamente
+- Local default: SQLite at `ribbit_local.db`; production database is configured with
+  `DATABASE_URL` (PostgreSQL).
+- Startup creates missing tables and applies additive SQLite/PostgreSQL-compatible column
+  migrations for the existing schema.
+- iTunes is used to fill a missing preview URL and save it to the catalog. Spotify operations
+  are mocked when credentials are unavailable.

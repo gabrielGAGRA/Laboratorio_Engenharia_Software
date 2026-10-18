@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from sqlalchemy import (
     Boolean,
     Column,
+    Date,
     DateTime,
     Float,
     ForeignKey,
@@ -51,6 +52,7 @@ class UsuarioModel(Base):
     generos_bloqueados = Column(Text, nullable=True)
     is_admin = Column(Boolean, nullable=False, default=False)
     criado_em = Column(DateTime(timezone=True), default=_utc_now, nullable=False)
+    data_nascimento = Column(Date, nullable=True)
 
     plano = relationship("PlanoModel", back_populates="usuarios")
     titular = relationship(
@@ -131,6 +133,8 @@ class PlaylistModel(Base):
     spotify_playlist_id = Column(String(64), nullable=True)
     is_exportada = Column(Boolean, default=False, nullable=False)
     criado_em = Column(DateTime(timezone=True), default=_utc_now, nullable=False)
+    duracao_maxima_segundos = Column(Integer, nullable=True)
+    filtros_deck = Column(Text, nullable=True)
 
     usuario = relationship("UsuarioModel", back_populates="playlists")
     itens = relationship(
@@ -171,9 +175,24 @@ class JamModel(Base):
     is_ativa = Column(Boolean, default=True, nullable=False)
     musica_atual_id = Column(Integer, ForeignKey("musicas.musica_id"), nullable=True)
     criado_em = Column(DateTime(timezone=True), default=_utc_now, nullable=False)
+    duracao_minutos = Column(Integer, nullable=False, default=60)
+    limite_superlikes = Column(Integer, nullable=False, default=10)
+    superlikes_usados = Column(Integer, nullable=False, default=0)
+    meta_votos_pular = Column(Integer, nullable=False, default=3)
+    duracao_acumulada_segundos = Column(Integer, nullable=False, default=0)
+    fonte_deck = Column(String(32), nullable=False, default="livre")
+    playlist_origem_id = Column(
+        Integer, ForeignKey("playlists.playlist_id"), nullable=True
+    )
 
     fila = relationship(
         "JamFilaModel", back_populates="jam", cascade="all, delete-orphan"
+    )
+    participantes = relationship(
+        "JamParticipanteModel", back_populates="jam", cascade="all, delete-orphan"
+    )
+    votos_pular = relationship(
+        "JamVotoPularModel", back_populates="jam", cascade="all, delete-orphan"
     )
 
 
@@ -197,10 +216,56 @@ class JamFilaModel(Base):
     musica = relationship("MusicaModel", back_populates="fila_itens")
 
 
+class JamParticipanteModel(Base):
+    """Participantes autenticados de uma sala Jam."""
+
+    __tablename__ = "jam_participantes"
+    __table_args__ = (
+        UniqueConstraint("jam_id", "usuario_id", name="uq_jam_participante"),
+    )
+
+    jam_participante_id = Column(Integer, primary_key=True, autoincrement=True)
+    jam_id = Column(
+        Integer, ForeignKey("jams.jam_id", ondelete="CASCADE"), nullable=False
+    )
+    usuario_id = Column(
+        Integer, ForeignKey("usuarios.usuario_id", ondelete="CASCADE"), nullable=False
+    )
+    criado_em = Column(DateTime(timezone=True), default=_utc_now, nullable=False)
+
+    jam = relationship("JamModel", back_populates="participantes")
+
+
+class JamVotoPularModel(Base):
+    """Votos únicos de participantes para pular a faixa atual."""
+
+    __tablename__ = "jam_votos_pular"
+    __table_args__ = (
+        UniqueConstraint("jam_id", "musica_id", "usuario_id", name="uq_jam_voto_pular"),
+    )
+
+    jam_voto_pular_id = Column(Integer, primary_key=True, autoincrement=True)
+    jam_id = Column(
+        Integer, ForeignKey("jams.jam_id", ondelete="CASCADE"), nullable=False
+    )
+    musica_id = Column(
+        Integer, ForeignKey("musicas.musica_id", ondelete="CASCADE"), nullable=False
+    )
+    usuario_id = Column(
+        Integer, ForeignKey("usuarios.usuario_id", ondelete="CASCADE"), nullable=False
+    )
+    criado_em = Column(DateTime(timezone=True), default=_utc_now, nullable=False)
+
+    jam = relationship("JamModel", back_populates="votos_pular")
+
+
 class AvaliacaoComentarioModel(Base):
     """Modelo ORM da tabela avaliacoes_comentarios."""
 
     __tablename__ = "avaliacoes_comentarios"
+    __table_args__ = (
+        UniqueConstraint("usuario_id", "musica_id", name="uq_avaliacao_usuario_musica"),
+    )
 
     avaliacao_id = Column(Integer, primary_key=True, autoincrement=True)
     usuario_id = Column(
@@ -215,3 +280,32 @@ class AvaliacaoComentarioModel(Base):
 
     usuario = relationship("UsuarioModel", back_populates="avaliacoes")
     musica = relationship("MusicaModel", back_populates="avaliacoes")
+    curtidas = relationship(
+        "AvaliacaoCurtidaModel",
+        back_populates="avaliacao",
+        cascade="all, delete-orphan",
+    )
+
+
+class AvaliacaoCurtidaModel(Base):
+    """Curtidas únicas de usuários em avaliações."""
+
+    __tablename__ = "avaliacoes_curtidas"
+    __table_args__ = (
+        UniqueConstraint(
+            "avaliacao_id", "usuario_id", name="uq_avaliacao_curtida_usuario"
+        ),
+    )
+
+    avaliacao_curtida_id = Column(Integer, primary_key=True, autoincrement=True)
+    avaliacao_id = Column(
+        Integer,
+        ForeignKey("avaliacoes_comentarios.avaliacao_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    usuario_id = Column(
+        Integer, ForeignKey("usuarios.usuario_id", ondelete="CASCADE"), nullable=False
+    )
+    criado_em = Column(DateTime(timezone=True), default=_utc_now, nullable=False)
+
+    avaliacao = relationship("AvaliacaoComentarioModel", back_populates="curtidas")

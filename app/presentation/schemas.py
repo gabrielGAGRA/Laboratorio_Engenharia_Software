@@ -1,6 +1,6 @@
 """Pydantic DTOs for API requests and responses."""
 
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
@@ -21,6 +21,7 @@ class UsuarioResponse(BaseModel):
     email: str
     nome_exibicao: str
     idade: int
+    data_nascimento: date | None = None
     plano_id: int
     spotify_id: str | None = None
     titular_id: int | None = None
@@ -33,13 +34,19 @@ class CadastroUsuarioRequest(BaseModel):
     email: EmailStr
     senha: str = Field(min_length=6)
     nome_exibicao: str = Field(min_length=2)
-    idade: int = Field(ge=0)
+    data_nascimento: date
     plano_id: int | None = None
 
 
 class LoginRequest(BaseModel):
     email: EmailStr
     senha: str
+
+
+class LoginResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    usuario: UsuarioResponse
 
 
 class AtualizarRestricaoMenoresRequest(BaseModel):
@@ -64,8 +71,13 @@ class MusicaResponse(BaseModel):
     is_deleted: bool
 
 
+class PaginaMusicasResponse(BaseModel):
+    items: list[MusicaResponse]
+    next_cursor: int | None
+    has_more: bool
+
+
 class InteracaoRequest(BaseModel):
-    usuario_id: int
     musica_id: int
     acao: str
 
@@ -81,9 +93,8 @@ class InteracaoResponse(BaseModel):
 
 
 class DeckPlaylistRequest(BaseModel):
-    usuario_id: int
-    nome: str
-    duracao_minutos: int | None = None
+    nome: str = Field(min_length=1, max_length=255)
+    duracao_minutos: int | None = Field(default=None, gt=0)
     genero: str | None = None
     ano: int | None = None
     artista: str | None = None
@@ -100,11 +111,17 @@ class PlaylistResponse(BaseModel):
     descricao: str | None = None
     spotify_playlist_id: str | None = None
     is_exportada: bool
-    musicas: list[MusicaResponse] = []
+    musicas: list[MusicaResponse] = Field(default_factory=list)
+    duracao_total_segundos: int = 0
 
 
 class SwipeAddMusicaRequest(BaseModel):
     musica_id: int
+    acao: str = "curtida"
+
+
+class AtualizarPlaylistResponse(PlaylistResponse):
+    pass
 
 
 class AtualizarPerfilRequest(BaseModel):
@@ -113,49 +130,58 @@ class AtualizarPerfilRequest(BaseModel):
 
 
 class VincularSpotifyRequest(BaseModel):
-    usuario_id: int
     spotify_id: str
 
 
 class AlterarPlanoRequest(BaseModel):
-    usuario_id: int
     novo_plano_id: int
 
 
 class TrocarInteracaoRequest(BaseModel):
-    usuario_id: int
     musica_id: int
     nova_acao: str
 
 
 class GenerosBloqueadosRequest(BaseModel):
-    usuario_id: int
-    generos_bloqueados: str
+    generos_bloqueados: list[str]
 
 
 class AdicionarMembroFamiliaRequest(BaseModel):
-    titular_id: int
-    dependente_id: int
+    email: EmailStr
+    senha: str = Field(min_length=6)
+    nome_exibicao: str = Field(min_length=2)
+    data_nascimento: date
 
 
 class CriarJamRequest(BaseModel):
-    host_usuario_id: int
-    nome_sala: str
+    nome_sala: str = Field(min_length=1, max_length=150)
+    duracao_minutos: int = Field(default=60, gt=0)
+    limite_superlikes: int = Field(default=10, ge=0)
+    meta_votos_pular: int = Field(default=3, gt=0)
+    fonte_deck: str = "livre"
+    playlist_origem_id: int | None = None
 
 
 class EntrarJamRequest(BaseModel):
-    codigo_sala: str
+    codigo_sala: str = Field(pattern=r"^\d{6}$")
 
 
 class VotarMusicaJamRequest(BaseModel):
-    usuario_id: int
     musica_id: int
-    pontos: int = 1
 
 
 class PularMusicaJamRequest(BaseModel):
-    usuario_id: int
+    musica_id: int | None = None
+
+
+class InteragirDeckJamRequest(BaseModel):
     musica_id: int
+    acao: str
+
+
+class SalvarFaixaJamRequest(BaseModel):
+    musica_id: int
+    playlist_id: int | None = None
 
 
 class JamFilaResponse(BaseModel):
@@ -176,16 +202,22 @@ class JamResponse(BaseModel):
     codigo_sala: str
     is_ativa: bool
     musica_atual_id: int | None = None
+    duracao_minutos: int
+    limite_superlikes: int
+    superlikes_usados: int
+    meta_votos_pular: int
+    duracao_acumulada_segundos: int
+    fonte_deck: str
 
 
 class JamEstadoResponse(BaseModel):
     jam: JamResponse
     musica_atual: MusicaResponse | None = None
-    fila: list[JamFilaResponse] = []
+    fila: list[JamFilaResponse] = Field(default_factory=list)
+    votos_pular: int = 0
 
 
 class PublicarReviewRequest(BaseModel):
-    usuario_id: int
     musica_id: int
     nota: int = Field(ge=1, le=5)
     texto: str | None = None
@@ -208,3 +240,25 @@ class AtualizarPlanoAdminRequest(BaseModel):
     novo_preco: float | None = None
     novo_nome: str | None = None
     max_perfis: int | None = None
+
+
+class AtualizarAdminRequest(BaseModel):
+    is_admin: bool
+
+
+class BloquearMusicaRequest(BaseModel):
+    bloqueada: bool
+
+
+class SalvarMusicaRequest(BaseModel):
+    playlist_id: int | None = None
+
+
+class MusicaReviewsResponse(BaseModel):
+    musica: MusicaResponse
+    reviews: list[ReviewResponse] = Field(default_factory=list)
+
+
+class ReviewCurtiuResponse(BaseModel):
+    review: ReviewResponse
+    curtiu: bool

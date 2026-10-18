@@ -1,114 +1,98 @@
-"""Administration console router for catalog moderation and executive dashboard."""
+"""Administration routes protected by the authenticated admin role."""
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, Header
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends
 
 from app.application.admin_use_cases import AdminUseCases
-from app.application.auth_use_cases import AuthUseCases
+from app.application.exceptions import BusinessRuleViolationError
 from app.domain.entities import Usuario
-from app.domain.exceptions import ForbiddenError, UnauthorizedError
-from app.infrastructure.database import get_db
-from app.infrastructure.repositories import UsuarioRepository
-from app.presentation.dependencies import get_admin_use_cases, get_auth_use_cases
+from app.presentation.dependencies import get_admin_use_cases, get_current_admin
 from app.presentation.schemas import (
-    AtualizarRestricaoMenoresRequest,
+    AtualizarAdminRequest,
     AtualizarPlanoAdminRequest,
-    LoginRequest,
+    BloquearMusicaRequest,
+    MusicaResponse,
     PlanoResponse,
     UsuarioResponse,
 )
 
-router = APIRouter(prefix="/api/admin", tags=["Admin Console"])
+router = APIRouter(
+    prefix="/api/admin",
+    tags=["Admin Console"],
+    dependencies=[Depends(get_current_admin)],
+)
 
 
-def verificar_admin(
-    admin_id: int | None = Header(None, alias="X-Admin-Id"),
-    db: Session = Depends(get_db),
-) -> Usuario:
-    """Valida se a requisição possui credencial de administrador válida."""
-    if admin_id is None:
-        raise UnauthorizedError("Identificação de administrador ausente.")
-    usuario = UsuarioRepository(db).buscar_por_id(admin_id)
-    if not usuario or not usuario.is_admin:
-        raise ForbiddenError("Acesso restrito a administradores.")
-    return usuario
-
-
-@router.post("/login", response_model=UsuarioResponse)
-def login_admin(
-    req: LoginRequest,
-    auth_use_cases: AuthUseCases = Depends(get_auth_use_cases),
-) -> UsuarioResponse:
-    admin = auth_use_cases.login_admin(email=req.email, senha=req.senha)
-    return UsuarioResponse.model_validate(admin)
-
-
-@router.get("/dashboard", dependencies=[Depends(verificar_admin)])
+@router.get("/dashboard")
 def dashboard_executivo(
     use_cases: AdminUseCases = Depends(get_admin_use_cases),
 ) -> dict[str, Any]:
     return use_cases.obter_dashboard_executivo()
 
 
-@router.get("/usuarios", dependencies=[Depends(verificar_admin)])
-def gerenciar_usuarios(
-    use_cases: AdminUseCases = Depends(get_admin_use_cases),
-) -> list[dict[str, Any]]:
-    return use_cases.gerenciar_usuarios_planos()
-
-
-@router.get("/audiencia", dependencies=[Depends(verificar_admin)])
+@router.get("/audiencia")
 def relatorio_audiencia(
     use_cases: AdminUseCases = Depends(get_admin_use_cases),
 ) -> dict[str, Any]:
     return use_cases.obter_relatorio_audiencia()
 
 
-@router.post("/musicas/{musica_id}/bloquear", dependencies=[Depends(verificar_admin)])
-def bloquear_musica(
-    musica_id: int,
+@router.get("/administradores", response_model=list[UsuarioResponse])
+def listar_administradores(
     use_cases: AdminUseCases = Depends(get_admin_use_cases),
-) -> dict[str, bool]:
-    sucesso = use_cases.bloquear_musica(musica_id=musica_id)
-    return {"bloqueado": sucesso}
+) -> list[UsuarioResponse]:
+    return [
+        UsuarioResponse.model_validate(usuario)
+        for usuario in use_cases.listar_administradores()
+    ]
 
 
-@router.put(
-    "/musicas/{musica_id}/restricao-menores",
-    dependencies=[Depends(verificar_admin)],
-)
-def atualizar_restricao_menores(
-    musica_id: int,
-    req: AtualizarRestricaoMenoresRequest,
-    use_cases: AdminUseCases = Depends(get_admin_use_cases),
-) -> dict[str, int | bool]:
-    bloqueado = use_cases.atualizar_restricao_menores(
-        musica_id=musica_id,
-        bloqueado_para_menores=req.bloqueado_para_menores,
-    )
-    return {"musica_id": musica_id, "bloqueado_para_menores": bloqueado}
-
-
-@router.put(
-    "/usuarios/{usuario_id}/promover-admin",
-    response_model=UsuarioResponse,
-    dependencies=[Depends(verificar_admin)],
-)
-def promover_admin(
+@router.put("/administradores/{usuario_id}", response_model=UsuarioResponse)
+def atualizar_administrador(
     usuario_id: int,
+    req: AtualizarAdminRequest,
+    administrador: Usuario = Depends(get_current_admin),
     use_cases: AdminUseCases = Depends(get_admin_use_cases),
 ) -> UsuarioResponse:
-    usuario = use_cases.promover_usuario_para_admin(usuario_id=usuario_id)
+    if administrador.usuario_id == usuario_id and not req.is_admin:
+        raise BusinessRuleViolationError(
+            "O administrador autenticado não pode remover seu próprio acesso."
+        )
+    usuario = use_cases.atualizar_papel_admin(usuario_id, req.is_admin)
     return UsuarioResponse.model_validate(usuario)
 
 
-@router.put(
-    "/planos/{plano_id}",
-    response_model=PlanoResponse,
-    dependencies=[Depends(verificar_admin)],
-)
+@router.get("/musicas-bloqueadas", response_model=list[MusicaResponse])
+def listar_musicas_bloqueadas(
+    use_cases: AdminUseCases = Depends(get_admin_use_cases),
+) -> list[MusicaResponse]:
+    return [
+        MusicaResponse.model_validate(musica)
+        for musica in use_cases.listar_musicas_bloqueadas()
+    ]
+
+
+@router.put("/musicas/{musica_id}/bloquear")
+def bloquear_musica(
+    musica_id: int,
+    req: BloquearMusicaRequest,
+    use_cases: AdminUseCases = Depends(get_admin_use_cases),
+) -> dict[str, int | bool]:
+    return {
+        "musica_id": musica_id,
+        "bloqueada": use_cases.bloquear_musica(musica_id, req.bloqueada),
+    }
+
+
+@router.get("/planos", response_model=list[PlanoResponse])
+def listar_planos(
+    use_cases: AdminUseCases = Depends(get_admin_use_cases),
+) -> list[PlanoResponse]:
+    return [PlanoResponse.model_validate(plano) for plano in use_cases.listar_planos()]
+
+
+@router.put("/planos/{plano_id}", response_model=PlanoResponse)
 def atualizar_plano(
     plano_id: int,
     req: AtualizarPlanoAdminRequest,
@@ -121,10 +105,3 @@ def atualizar_plano(
         max_perfis=req.max_perfis,
     )
     return PlanoResponse.model_validate(plano)
-
-
-@router.get("/comentarios", dependencies=[Depends(verificar_admin)])
-def top_comentarios(
-    use_cases: AdminUseCases = Depends(get_admin_use_cases),
-) -> list[dict[str, Any]]:
-    return use_cases.ver_top_comentarios()

@@ -4,6 +4,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+from app.application.auth_use_cases import hash_password
 from app.domain.entities import Interacao, Usuario
 from app.infrastructure.database import Base
 from app.infrastructure.repositories import (
@@ -11,6 +12,11 @@ from app.infrastructure.repositories import (
     MusicaRepository,
     PlanoRepository,
     UsuarioRepository,
+)
+from app.infrastructure.security import (
+    criar_access_token,
+    decodificar_access_token,
+    validar_configuracao_seguranca,
 )
 from app.infrastructure.seed import run_seed
 
@@ -21,7 +27,7 @@ def db_session():
     Base.metadata.create_all(engine)
     TestingSessionLocal = sessionmaker(bind=engine)
     session = TestingSessionLocal()
-    run_seed(session)
+    run_seed(session, hash_password)
     yield session
     session.close()
 
@@ -34,6 +40,9 @@ def test_seed_populates_planos_and_musicas(db_session):
     assert "Free" in nomes
     assert "Individual" in nomes
     assert "Família" in nomes
+    assert any(
+        usuario.is_admin for usuario in UsuarioRepository(db_session).listar_todos()
+    )
 
     musica_repo = MusicaRepository(db_session)
     musicas = musica_repo.listar_ativas()
@@ -74,3 +83,17 @@ def test_usuario_and_interacao_persistence(db_session):
     assert interacao_repo.listar_ids_musicas_interagidas(usuario.usuario_id) == [
         musica.musica_id
     ]
+
+
+def test_signed_access_tokens_reject_tampering():
+    token = criar_access_token(123)
+    assert decodificar_access_token(token) == 123
+    with pytest.raises(ValueError, match="Token de acesso inválido"):
+        decodificar_access_token(f"{token[:-1]}x")
+
+
+def test_production_requires_a_persistent_signing_key(monkeypatch):
+    monkeypatch.setenv("RIBBIT_ENV", "production")
+    monkeypatch.delenv("RIBBIT_SECRET_KEY", raising=False)
+    with pytest.raises(RuntimeError, match="RIBBIT_SECRET_KEY"):
+        validar_configuracao_seguranca()

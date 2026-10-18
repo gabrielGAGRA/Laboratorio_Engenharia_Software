@@ -1,5 +1,7 @@
 """Unit tests for domain entities and domain rules."""
 
+from datetime import date
+
 from app.domain.entities import Interacao, Musica, Plano, Usuario
 
 
@@ -21,6 +23,20 @@ def test_usuario_entity_creation():
     assert usuario.email == "user@example.com"
     assert usuario.is_admin is False
     assert usuario.titular_id is None
+
+
+def test_idade_calculada_a_partir_da_data_de_nascimento():
+    usuario = Usuario(
+        usuario_id=1,
+        email="child@example.com",
+        senha_hash="hashed_pw",
+        nome_exibicao="Child",
+        idade=0,
+        plano_id=1,
+        data_nascimento=date(2010, 10, 18),
+    )
+    assert usuario.idade_atual(date(2026, 10, 17)) == 15
+    assert usuario.idade_atual(date(2026, 10, 18)) == 16
 
 
 def test_musica_entity_creation():

@@ -2,8 +2,12 @@
 
 from typing import Any
 
-from app.domain.entities import Plano, Usuario
-from app.domain.exceptions import EntityNotFoundError
+from app.application.exceptions import (
+    BusinessRuleViolationError,
+    DuplicateEntityError,
+    EntityNotFoundError,
+)
+from app.domain.entities import Musica, Plano, Usuario
 from app.domain.ports import (
     AvaliacaoRepositoryPort,
     MusicaRepositoryPort,
@@ -68,7 +72,7 @@ class AdminUseCases:
                 "usuario_id": u.usuario_id,
                 "email": u.email,
                 "nome_exibicao": u.nome_exibicao,
-                "idade": u.idade,
+                "idade": u.idade_atual(),
                 "plano": planos.get(u.plano_id, "Desconhecido"),
                 "is_admin": u.is_admin,
             }
@@ -77,27 +81,39 @@ class AdminUseCases:
 
     def obter_relatorio_audiencia(self) -> dict[str, Any]:
         """Retorna contadores de audiência e catálogo."""
+        generos_bloqueados: dict[str, int] = {}
+        for usuario in self.usuario_repo.listar_todos():
+            for genero in usuario.lista_generos_bloqueados():
+                generos_bloqueados[genero] = generos_bloqueados.get(genero, 0) + 1
         return {
             "total_usuarios": len(self.usuario_repo.listar_todos()),
             "total_musicas": self.musica_repo.contar_todas(),
-            "musicas_ativas": len(self.musica_repo.listar_ativas(limite=1000)),
+            "musicas_ativas": self.musica_repo.contar_ativas(),
+            "generos_bloqueados": generos_bloqueados,
         }
 
-    def obter_logs_auditoria(self) -> list[dict[str, Any]]:
-        """Retorna registros de auditoria do sistema."""
+    def listar_administradores(self) -> list[Usuario]:
+        """Lista usuários com privilégio administrativo."""
         return [
-            {"evento": "SISTEMA_INICIALIZADO", "status": "OK"},
-            {"evento": "AUDITORIA_CATALOGO", "status": "OK"},
+            usuario for usuario in self.usuario_repo.listar_todos() if usuario.is_admin
         ]
 
-    def bloquear_musica(self, musica_id: int) -> bool:
-        """Aplica soft-delete na faixa musical (is_deleted = True)."""
+    def bloquear_musica(self, musica_id: int, bloqueada: bool) -> bool:
+        """Oculta ou reexibe uma faixa no catálogo."""
         musica = self.musica_repo.buscar_por_id(musica_id)
         if not musica:
             raise EntityNotFoundError(f"Música {musica_id} não encontrada.")
-        musica.is_deleted = True
+        musica.is_deleted = bloqueada
         self.musica_repo.salvar(musica)
-        return True
+        return musica.is_deleted
+
+    def listar_musicas_bloqueadas(self) -> list[Musica]:
+        """Lista músicas ocultadas do catálogo."""
+        return self.musica_repo.listar_bloqueadas()
+
+    def listar_planos(self) -> list[Plano]:
+        """Lista planos disponíveis para administração."""
+        return self.plano_repo.listar_todos()
 
     def atualizar_restricao_menores(
         self, musica_id: int, bloqueado_para_menores: bool
@@ -110,12 +126,12 @@ class AdminUseCases:
         self.musica_repo.salvar(musica)
         return musica.bloqueado_para_menores
 
-    def promover_usuario_para_admin(self, usuario_id: int) -> Usuario:
-        """Concede privilégios de administrador para um usuário."""
+    def atualizar_papel_admin(self, usuario_id: int, is_admin: bool) -> Usuario:
+        """Define se um usuário possui papel administrativo."""
         usuario = self.usuario_repo.buscar_por_id(usuario_id)
         if not usuario:
             raise EntityNotFoundError(f"Usuário {usuario_id} não encontrado.")
-        usuario.is_admin = True
+        usuario.is_admin = is_admin
         return self.usuario_repo.salvar(usuario)
 
     def atualizar_planos_existentes(
@@ -130,10 +146,32 @@ class AdminUseCases:
         if not plano:
             raise EntityNotFoundError(f"Plano {plano_id} não encontrado.")
 
+        if novo_preco is not None and novo_preco < 0:
+            raise BusinessRuleViolationError("O preço do plano não pode ser negativo.")
+        if max_perfis is not None and max_perfis < 1:
+            raise BusinessRuleViolationError(
+                "O plano deve permitir ao menos um perfil."
+            )
+        if novo_nome is not None and not novo_nome.strip():
+            raise BusinessRuleViolationError("O nome do plano é obrigatório.")
+        if novo_nome is not None:
+            existente = self.plano_repo.buscar_por_nome(novo_nome)
+            if existente and existente.plano_id != plano_id:
+                raise DuplicateEntityError("Já existe um plano com esse nome.")
+        if max_perfis is not None:
+            for usuario in self.usuario_repo.listar_todos():
+                if usuario.plano_id == plano_id and usuario.titular_id is None:
+                    quantidade = len(
+                        self.usuario_repo.listar_dependentes(usuario.usuario_id)
+                    )
+                    if quantidade + 1 > max_perfis:
+                        raise BusinessRuleViolationError(
+                            "O limite não pode ser menor que os perfis já vinculados."
+                        )
         if novo_preco is not None:
             plano.preco_mensal = novo_preco
         if novo_nome is not None:
-            plano.nome = novo_nome
+            plano.nome = novo_nome.strip()
         if max_perfis is not None:
             plano.max_perfis = max_perfis
 

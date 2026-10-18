@@ -1,12 +1,14 @@
 """Ribbit Platform Backend V0 - FastAPI Application Root."""
 
+import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 
-from app.domain.exceptions import (
+from app.application.auth_use_cases import hash_password
+from app.application.exceptions import (
     BusinessRuleViolationError,
     CustomError,
     DuplicateEntityError,
@@ -15,6 +17,8 @@ from app.domain.exceptions import (
     UnauthorizedError,
 )
 from app.infrastructure.database import Base, SessionLocal, engine
+from app.infrastructure.migrations import migrar_colunas_aditivas
+from app.infrastructure.security import validar_configuracao_seguranca
 from app.infrastructure.seed import run_seed
 from app.presentation.routers.admin import router as admin_router
 from app.presentation.routers.auth import router as auth_router
@@ -28,12 +32,15 @@ from app.presentation.routers.playlists import router as playlists_router
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     """Inicialização das tabelas e execução do seed de dados locais."""
+    validar_configuracao_seguranca()
     Base.metadata.create_all(bind=engine)
-    session = SessionLocal()
-    try:
-        run_seed(session)
-    finally:
-        session.close()
+    migrar_colunas_aditivas(engine)
+    if os.getenv("RIBBIT_ENV", "development").lower() != "production":
+        session = SessionLocal()
+        try:
+            run_seed(session, hash_password)
+        finally:
+            session.close()
     yield
 
 

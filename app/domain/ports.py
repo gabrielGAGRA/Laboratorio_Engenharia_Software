@@ -80,7 +80,8 @@ class MusicaRepositoryPort(ABC):
         generos_excluidos: list[str] | None = None,
         bloquear_menores: bool = False,
         ids_excluidos: list[int] | None = None,
-        limite: int = 50,
+        limite: int | None = 50,
+        cursor_id: int | None = None,
     ) -> list[Musica]:
         """Retorna músicas ativas aptas para descoberta."""
 
@@ -91,13 +92,28 @@ class MusicaRepositoryPort(ABC):
         album: str | None = None,
         genero: str | None = None,
         ano: int | None = None,
+        pais: str | None = None,
         termo: str | None = None,
+        generos_excluidos: list[str] | None = None,
+        bloquear_menores: bool = False,
+        ids_excluidos: list[int] | None = None,
+        duracao_maxima_segundos: int | None = None,
+        cursor_id: int | None = None,
+        limite: int | None = None,
     ) -> list[Musica]:
         """Busca músicas por filtros textuais."""
 
     @abstractmethod
     def contar_todas(self) -> int:
         """Retorna contagem total de faixas."""
+
+    @abstractmethod
+    def listar_bloqueadas(self) -> list[Musica]:
+        """Lista faixas removidas do catálogo."""
+
+    @abstractmethod
+    def contar_ativas(self) -> int:
+        """Retorna contagem de faixas visíveis no catálogo."""
 
 
 class InteracaoRepositoryPort(ABC):
@@ -134,6 +150,10 @@ class PlaylistRepositoryPort(ABC):
     @abstractmethod
     def listar_por_usuario(self, usuario_id: int) -> list[Playlist]:
         """Lista todas as playlists criadas pelo usuário."""
+
+    @abstractmethod
+    def excluir(self, playlist_id: int) -> bool:
+        """Remove uma playlist e suas associações."""
 
     @abstractmethod
     def salvar(self, playlist: Playlist) -> Playlist:
@@ -183,6 +203,26 @@ class JamRepositoryPort(ABC):
     def remover_musica_fila(self, jam_id: int, musica_id: int) -> bool:
         """Remove música da fila."""
 
+    @abstractmethod
+    def adicionar_participante(self, jam_id: int, usuario_id: int) -> None:
+        """Registra participante na sala."""
+
+    @abstractmethod
+    def eh_participante(self, jam_id: int, usuario_id: int) -> bool:
+        """Informa se o usuário participa da sala."""
+
+    @abstractmethod
+    def registrar_voto_pular(self, jam_id: int, musica_id: int, usuario_id: int) -> int:
+        """Registra voto único e retorna a quantidade de votos da faixa."""
+
+    @abstractmethod
+    def contar_votos_pular(self, jam_id: int, musica_id: int) -> int:
+        """Conta votos únicos para pular uma faixa."""
+
+    @abstractmethod
+    def limpar_votos_pular(self, jam_id: int, musica_id: int) -> None:
+        """Remove votos antigos da faixa ao avançar a sala."""
+
 
 class AvaliacaoRepositoryPort(ABC):
     """Contrato de persistência para Avaliações e Comentários."""
@@ -206,6 +246,20 @@ class AvaliacaoRepositoryPort(ABC):
         self, dias: int = 5, limite: int = 3
     ) -> list[AvaliacaoComentario]:
         """Retorna as avaliações mais curtidas nos últimos N dias."""
+
+    @abstractmethod
+    def buscar_por_usuario_e_musica(
+        self, usuario_id: int, musica_id: int
+    ) -> AvaliacaoComentario | None:
+        """Busca avaliação de um usuário para uma faixa."""
+
+    @abstractmethod
+    def excluir(self, avaliacao_id: int) -> bool:
+        """Remove uma avaliação."""
+
+    @abstractmethod
+    def curtir(self, avaliacao_id: int, usuario_id: int) -> AvaliacaoComentario | None:
+        """Registra uma curtida única e retorna a avaliação atualizada."""
 
 
 class ExternalMusicServicePort(ABC):

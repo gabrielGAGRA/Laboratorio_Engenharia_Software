@@ -1,5 +1,6 @@
 """External API adapters for Spotify and iTunes."""
 
+import hashlib
 import logging
 from http import HTTPStatus
 from typing import Any
@@ -22,9 +23,10 @@ class ExternalMusicServiceAdapter(ExternalMusicServicePort):
     ) -> list[dict[str, Any]]:
         """Busca faixas via API REST do Spotify com fallback seguro."""
         if not self.spotify_token:
+            identificador = hashlib.sha256(consulta.encode("utf-8")).hexdigest()[:12]
             return [
                 {
-                    "spotify_id": f"sp_{hash(consulta)}_{i}",
+                    "spotify_id": f"sp_{identificador}_{i}",
                     "titulo": f"Track {consulta} {i}",
                     "artista": "Spotify Artist",
                     "album": "Demo Album",
@@ -83,13 +85,7 @@ class ExternalMusicServiceAdapter(ExternalMusicServicePort):
         except httpx.HTTPError as exc:
             logger.warning("Erro ao consultar iTunes: %s", exc)
 
-        return {
-            "track_id": f"it_{hash(termo)}",
-            "titulo": termo,
-            "artista": "iTunes Artist",
-            "preview_url": f"https://audio-ssl.itunes.apple.com/preview/{termo}.mp3",
-            "capa_url": "https://example.com/artwork.jpg",
-        }
+        return None
 
     def exportar_playlist_spotify(
         self, usuario_spotify_id: str, nome: str, ids_faixas: list[str]

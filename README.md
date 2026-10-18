@@ -41,6 +41,7 @@ O projeto é composto por duas frentes:
 
 #### 2. Descoberta por Swipe
 - Feed central de novas faixas que descarta músicas já avaliadas ou gêneros bloqueados.
+- Faixas marcadas como inadequadas para menores são filtradas em descoberta, playlists e Jams.
 - Avaliação gestual rápida:
   - **Like (Direita)**: Envia a música para as Curtidas.
   - **Superlike (Cima)**: Adiciona a faixa às Amadas e Curtidas em lista separada.
@@ -57,15 +58,15 @@ O projeto é composto por duas frentes:
 
 #### 4. Jams Colaborativas
 - Criação de salas em grupo com convite para amigos.
-- Sistema de pontuação coletiva por swipe: Like (+1), Deslike (0) e Superlike (+1 com destaque de prioridade).
-- Envio direto de faixas supercurtidas para o *deck* de um amigo participante.
-- Votação democrática para pular músicas da fila em reprodução.
+- Sistema de pontuação coletiva por swipe: Like (+1) e Superlike (+2), sujeito ao limite da sala.
+- Sugestões da fila conforme a fonte configurada para a sala.
+- A fila avança automaticamente quando a meta de votos únicos para pular a faixa é atingida; o host pode encerrar a sala.
 - Acompanhamento do tempo total e restante com margem de tolerância de $\pm 1$ minuto.
 
 #### 5. Busca, Comunidade e Lançamentos
 - Busca universal por faixa, artista, álbum ou gênero.
 - Feed com suporte à avaliação imediata.
-- Publicação, edição e exclusão de comentários e avaliações comunitárias em cada música.
+- Publicação e exclusão pelo autor de comentários e avaliações comunitárias em cada música.
 
 #### 6. Perfil e Dados
 - Gestão e edição de listas de Curtidas, Amadas, Rejeitadas e Artistas favoritos.
@@ -108,7 +109,6 @@ Laboratorio_Engenharia_Software/
 │   ├── domain/                        # Camada de Domínio — Python puro
 │   │   ├── entities.py                # Dataclasses: Plano, Usuario, Musica, Interacao, Playlist, Jam, etc.
 │   │   ├── ports.py                   # ABCs: repositórios e serviço externo de música
-│   │   └── exceptions.py             # Hierarquia de erros de domínio
 │   ├── application/                   # Casos de Uso — orquestração pura
 │   │   ├── auth_use_cases.py
 │   │   ├── descoberta_use_cases.py
@@ -116,13 +116,17 @@ Laboratorio_Engenharia_Software/
 │   │   ├── perfil_use_cases.py
 │   │   ├── jam_use_cases.py
 │   │   ├── review_use_cases.py
-│   │   └── admin_use_cases.py
+│   │   ├── admin_use_cases.py
+│   │   ├── constants.py              # Constantes e regras compartilhadas
+│   │   └── exceptions.py             # Erros da camada de aplicação
 │   ├── infrastructure/                # Adaptadores de I/O
 │   │   ├── database.py               # Engine SQLAlchemy + get_db()
-│   │   ├── db_models.py              # Modelos ORM (9 tabelas)
+│   │   ├── db_models.py              # Modelos ORM
 │   │   ├── repositories.py           # Implementações concretas dos ports
 │   │   ├── apis_externas.py          # Adaptadores Spotify + iTunes
-│   │   └── seed.py                   # Dados iniciais: 3 planos + 5 músicas de amostra
+│   │   ├── migrations.py             # Migrações aditivas de schema
+│   │   ├── security.py               # Tokens Bearer assinados
+│   │   └── seed.py                   # Dados iniciais e administrador local
 │   └── presentation/                  # Camada HTTP
 │       ├── schemas.py                 # DTOs Pydantic v2
 │       ├── dependencies.py            # Injeção de dependência (DI)
@@ -133,14 +137,14 @@ Laboratorio_Engenharia_Software/
 │           ├── jams.py               # Criação e votação de Jams colaborativas
 │           ├── musicas_reviews.py    # Busca de músicas + reviews da comunidade
 │           ├── perfil.py             # Perfil, planos, família e estatísticas Premium
-│           └── admin.py              # Painel admin (protegido por X-Admin-Id)
+│           └── admin.py              # Rotas administrativas protegidas por token/role
 ├── tests/
 │   ├── test_domain.py
 │   ├── test_infrastructure.py
 │   ├── test_application.py
 │   └── test_e2e_flow.py
 ├── docs/
-│   ├── architecture/app/database/    # Esquemas SQL das 9 tabelas
+│   ├── architecture/app/database/    # Esquemas SQL auxiliares
 │   └── llm/app/                      # Guias para IAs: arquitetura, domínio, regras Python
 ├── .agents/                           # Regras e skills do agente de IA
 ├── pyproject.toml                     # Dependências e configuração Ruff/pytest
@@ -174,6 +178,10 @@ Crie um `.env` na raiz ou exporte no shell:
 # Integrações externas (opcional para V0)
 # SPOTIFY_CLIENT_ID=...
 # SPOTIFY_CLIENT_SECRET=...
+# RIBBIT_SECRET_KEY=<segredo-aleatorio-persistente> 
+# RIBBIT_ENV=production
+# RIBBIT_ADMIN_EMAIL=admin@ribbit.example.com
+# RIBBIT_ADMIN_PASSWORD=RibbitLocal2026!
 ```
 
 ### 3. Subir o servidor
@@ -182,7 +190,10 @@ Crie um `.env` na raiz ou exporte no shell:
 uv run uvicorn app.main:app --reload
 ```
 
-O banco SQLite (`ribbit_local.db`) e os dados de seed (3 planos + 5 músicas) são criados automaticamente na primeira inicialização.
+O banco SQLite (`ribbit_local.db`) e os dados de seed (3 planos, 5 músicas e um administrador
+local) são criados automaticamente na primeira inicialização fora de produção. Entre como
+`admin@ribbit.example.com` com a senha `RibbitLocal2026!`; configure `RIBBIT_SECRET_KEY` e
+desative o seed local em produção.
 
 Acesse a documentação interativa em: **http://localhost:8000/docs**
 

@@ -1,12 +1,12 @@
 """Use cases for song discovery deck and swipe interactions."""
 
-from app.domain.constants import IDADE_MINIMA_ADULTO
-from app.domain.entities import Interacao, Musica
-from app.domain.exceptions import (
+from app.application.exceptions import (
     BusinessRuleViolationError,
     EntityNotFoundError,
 )
+from app.domain.entities import Interacao, Musica
 from app.domain.ports import (
+    ExternalMusicServicePort,
     InteracaoRepositoryPort,
     MusicaRepositoryPort,
     UsuarioRepositoryPort,
@@ -18,6 +18,8 @@ ACOES_VALIDAS = {
     "amada": "amada",
     "superlike": "amada",
     "rejeitada": "rejeitada",
+    "deslike": "rejeitada",
+    "dislike": "rejeitada",
     "rejeitar": "rejeitada",
 }
 
@@ -30,10 +32,12 @@ class DescobertaUseCases:
         usuario_repo: UsuarioRepositoryPort,
         musica_repo: MusicaRepositoryPort,
         interacao_repo: InteracaoRepositoryPort,
+        external_service: ExternalMusicServicePort | None = None,
     ) -> None:
         self.usuario_repo = usuario_repo
         self.musica_repo = musica_repo
         self.interacao_repo = interacao_repo
+        self.external_service = external_service
 
     def obter_proxima_musica_swipe(self, usuario_id: int) -> Musica | None:
         """Retorna próxima música respeitando travas de idade, gênero e faixas já avaliadas."""
@@ -41,7 +45,7 @@ class DescobertaUseCases:
         if not usuario:
             raise EntityNotFoundError(f"Usuário com ID {usuario_id} não encontrado.")
 
-        bloquear_menores = usuario.idade < IDADE_MINIMA_ADULTO
+        bloquear_menores = usuario.eh_menor_de_idade()
         generos_bloqueados = usuario.lista_generos_bloqueados()
         ids_interagidos = self.interacao_repo.listar_ids_musicas_interagidas(usuario_id)
 
@@ -52,7 +56,17 @@ class DescobertaUseCases:
             limite=1,
         )
 
-        return candidatas[0] if candidatas else None
+        if not candidatas:
+            return None
+        musica = candidatas[0]
+        if not musica.itunes_preview_url and self.external_service:
+            preview = self.external_service.buscar_preview_itunes(
+                f"{musica.artista} {musica.titulo}"
+            )
+            if preview and preview.get("preview_url"):
+                musica.itunes_preview_url = str(preview["preview_url"])
+                self.musica_repo.salvar(musica)
+        return musica
 
     def registrar_interacao_swipe(
         self, usuario_id: int, musica_id: int, acao: str
@@ -73,6 +87,12 @@ class DescobertaUseCases:
             raise EntityNotFoundError(
                 f"Música com ID {musica_id} não encontrada ou inativa."
             )
+        if usuario.eh_menor_de_idade() and musica.bloqueado_para_menores:
+            raise BusinessRuleViolationError(
+                "Música bloqueada para usuários menores de idade."
+            )
+        if musica.genero.lower().strip() in usuario.lista_generos_bloqueados():
+            raise BusinessRuleViolationError("Gênero bloqueado pelo usuário.")
 
         interacao = Interacao(
             interacao_id=None,

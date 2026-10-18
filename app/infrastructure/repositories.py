@@ -1,6 +1,6 @@
 """Concrete repository implementations mapping SQLAlchemy models to Domain entities."""
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
@@ -26,9 +26,12 @@ from app.domain.ports import (
 )
 from app.infrastructure.db_models import (
     AvaliacaoComentarioModel,
+    AvaliacaoCurtidaModel,
     InteracaoModel,
     JamFilaModel,
     JamModel,
+    JamParticipanteModel,
+    JamVotoPularModel,
     MusicaModel,
     PlanoModel,
     PlaylistModel,
@@ -38,18 +41,30 @@ from app.infrastructure.db_models import (
 
 
 def _to_usuario_entity(model: UsuarioModel) -> Usuario:
+    idade = model.idade
+    if model.data_nascimento:
+        hoje = date.today()
+        idade = (
+            hoje.year
+            - model.data_nascimento.year
+            - (
+                (hoje.month, hoje.day)
+                < (model.data_nascimento.month, model.data_nascimento.day)
+            )
+        )
     return Usuario(
         usuario_id=model.usuario_id,
         email=model.email,
         senha_hash=model.senha_hash,
         nome_exibicao=model.nome_exibicao,
-        idade=model.idade,
+        idade=idade,
         plano_id=model.plano_id,
         spotify_id=model.spotify_id,
         titular_id=model.titular_id,
         generos_bloqueados=model.generos_bloqueados,
         is_admin=model.is_admin,
         criado_em=model.criado_em,
+        data_nascimento=model.data_nascimento,
     )
 
 
@@ -103,6 +118,8 @@ def _to_playlist_entity(
         is_exportada=model.is_exportada,
         criado_em=model.criado_em,
         musicas=musicas or [],
+        duracao_maxima_segundos=model.duracao_maxima_segundos,
+        filtros_deck=model.filtros_deck,
     )
 
 
@@ -115,6 +132,13 @@ def _to_jam_entity(model: JamModel) -> Jam:
         is_ativa=model.is_ativa,
         musica_atual_id=model.musica_atual_id,
         criado_em=model.criado_em,
+        duracao_minutos=model.duracao_minutos,
+        limite_superlikes=model.limite_superlikes,
+        superlikes_usados=model.superlikes_usados,
+        meta_votos_pular=model.meta_votos_pular,
+        duracao_acumulada_segundos=model.duracao_acumulada_segundos,
+        fonte_deck=model.fonte_deck,
+        playlist_origem_id=model.playlist_origem_id,
     )
 
 
@@ -180,6 +204,7 @@ class UsuarioRepository(UsuarioRepositoryPort):
                 model.titular_id = usuario.titular_id
                 model.generos_bloqueados = usuario.generos_bloqueados
                 model.is_admin = usuario.is_admin
+                model.data_nascimento = usuario.data_nascimento
                 self.session.commit()
                 self.session.refresh(model)
                 return _to_usuario_entity(model)
@@ -194,6 +219,7 @@ class UsuarioRepository(UsuarioRepositoryPort):
             titular_id=usuario.titular_id,
             generos_bloqueados=usuario.generos_bloqueados,
             is_admin=usuario.is_admin,
+            data_nascimento=usuario.data_nascimento,
         )
         self.session.add(model)
         self.session.commit()
@@ -292,6 +318,14 @@ class MusicaRepository(MusicaRepositoryPort):
         return _to_musica_entity(model) if model else None
 
     def salvar(self, musica: Musica) -> Musica:
+        if not musica.musica_id and musica.spotify_id:
+            existente = (
+                self.session.query(MusicaModel)
+                .filter(MusicaModel.spotify_id == musica.spotify_id)
+                .first()
+            )
+            if existente:
+                musica.musica_id = existente.musica_id
         if musica.musica_id:
             model = (
                 self.session.query(MusicaModel)
@@ -301,6 +335,7 @@ class MusicaRepository(MusicaRepositoryPort):
             if model:
                 model.titulo = musica.titulo
                 model.artista = musica.artista
+                model.spotify_id = musica.spotify_id
                 model.album = musica.album
                 model.duracao_segundos = musica.duracao_segundos
                 model.genero = musica.genero
@@ -338,7 +373,8 @@ class MusicaRepository(MusicaRepositoryPort):
         generos_excluidos: list[str] | None = None,
         bloquear_menores: bool = False,
         ids_excluidos: list[int] | None = None,
-        limite: int = 50,
+        limite: int | None = 50,
+        cursor_id: int | None = None,
     ) -> list[Musica]:
         query = self.session.query(MusicaModel).filter(
             MusicaModel.is_deleted.is_(False)
@@ -349,6 +385,8 @@ class MusicaRepository(MusicaRepositoryPort):
 
         if ids_excluidos:
             query = query.filter(MusicaModel.musica_id.notin_(ids_excluidos))
+        if cursor_id is not None:
+            query = query.filter(MusicaModel.musica_id > cursor_id)
 
         if generos_excluidos:
             norm_generos = [g.lower().strip() for g in generos_excluidos if g.strip()]
@@ -357,7 +395,8 @@ class MusicaRepository(MusicaRepositoryPort):
                     func.lower(MusicaModel.genero).notin_(norm_generos)
                 )
 
-        models = query.limit(limite).all()
+        query = query.order_by(MusicaModel.musica_id)
+        models = query.limit(limite).all() if limite is not None else query.all()
         return [_to_musica_entity(m) for m in models]
 
     def buscar_por_filtros(
@@ -366,7 +405,14 @@ class MusicaRepository(MusicaRepositoryPort):
         album: str | None = None,
         genero: str | None = None,
         ano: int | None = None,
+        pais: str | None = None,
         termo: str | None = None,
+        generos_excluidos: list[str] | None = None,
+        bloquear_menores: bool = False,
+        ids_excluidos: list[int] | None = None,
+        duracao_maxima_segundos: int | None = None,
+        cursor_id: int | None = None,
+        limite: int | None = None,
     ) -> list[Musica]:
         query = self.session.query(MusicaModel).filter(
             MusicaModel.is_deleted.is_(False)
@@ -393,12 +439,46 @@ class MusicaRepository(MusicaRepositoryPort):
             query = query.filter(func.lower(MusicaModel.genero) == genero.lower())
         if ano:
             query = query.filter(MusicaModel.ano_lancamento == ano)
+        if pais:
+            query = query.filter(func.lower(MusicaModel.pais).like(f"%{pais.lower()}%"))
+
+        if generos_excluidos:
+            norm_generos = [item.lower().strip() for item in generos_excluidos]
+            query = query.filter(func.lower(MusicaModel.genero).notin_(norm_generos))
+        if bloquear_menores:
+            query = query.filter(MusicaModel.bloqueado_para_menores.is_(False))
+        if ids_excluidos:
+            query = query.filter(MusicaModel.musica_id.notin_(ids_excluidos))
+        if duracao_maxima_segundos is not None:
+            query = query.filter(
+                MusicaModel.duracao_segundos <= duracao_maxima_segundos
+            )
+        if cursor_id is not None:
+            query = query.filter(MusicaModel.musica_id > cursor_id)
+        query = query.order_by(MusicaModel.musica_id)
+        if limite is not None:
+            query = query.limit(limite)
 
         models = query.all()
         return [_to_musica_entity(m) for m in models]
 
     def contar_todas(self) -> int:
         return self.session.query(MusicaModel).count()
+
+    def listar_bloqueadas(self) -> list[Musica]:
+        models = (
+            self.session.query(MusicaModel)
+            .filter(MusicaModel.is_deleted.is_(True))
+            .all()
+        )
+        return [_to_musica_entity(model) for model in models]
+
+    def contar_ativas(self) -> int:
+        return (
+            self.session.query(MusicaModel)
+            .filter(MusicaModel.is_deleted.is_(False))
+            .count()
+        )
 
 
 class InteracaoRepository(InteracaoRepositoryPort):
@@ -518,6 +598,8 @@ class PlaylistRepository(PlaylistRepositoryPort):
                 model.descricao = playlist.descricao
                 model.spotify_playlist_id = playlist.spotify_playlist_id
                 model.is_exportada = playlist.is_exportada
+                model.duracao_maxima_segundos = playlist.duracao_maxima_segundos
+                model.filtros_deck = playlist.filtros_deck
                 self.session.commit()
                 self.session.refresh(model)
                 return _to_playlist_entity(model)
@@ -528,11 +610,25 @@ class PlaylistRepository(PlaylistRepositoryPort):
             descricao=playlist.descricao,
             spotify_playlist_id=playlist.spotify_playlist_id,
             is_exportada=playlist.is_exportada,
+            duracao_maxima_segundos=playlist.duracao_maxima_segundos,
+            filtros_deck=playlist.filtros_deck,
         )
         self.session.add(model)
         self.session.commit()
         self.session.refresh(model)
         return _to_playlist_entity(model)
+
+    def excluir(self, playlist_id: int) -> bool:
+        model = (
+            self.session.query(PlaylistModel)
+            .filter(PlaylistModel.playlist_id == playlist_id)
+            .first()
+        )
+        if not model:
+            return False
+        self.session.delete(model)
+        self.session.commit()
+        return True
 
     def adicionar_musica(self, playlist_id: int, musica_id: int) -> bool:
         existente = (
@@ -596,6 +692,13 @@ class JamRepository(JamRepositoryPort):
                 model.codigo_sala = jam.codigo_sala
                 model.is_ativa = jam.is_ativa
                 model.musica_atual_id = jam.musica_atual_id
+                model.duracao_minutos = jam.duracao_minutos
+                model.limite_superlikes = jam.limite_superlikes
+                model.superlikes_usados = jam.superlikes_usados
+                model.meta_votos_pular = jam.meta_votos_pular
+                model.duracao_acumulada_segundos = jam.duracao_acumulada_segundos
+                model.fonte_deck = jam.fonte_deck
+                model.playlist_origem_id = jam.playlist_origem_id
                 self.session.commit()
                 self.session.refresh(model)
                 return _to_jam_entity(model)
@@ -606,6 +709,13 @@ class JamRepository(JamRepositoryPort):
             codigo_sala=jam.codigo_sala,
             is_ativa=jam.is_ativa,
             musica_atual_id=jam.musica_atual_id,
+            duracao_minutos=jam.duracao_minutos,
+            limite_superlikes=jam.limite_superlikes,
+            superlikes_usados=jam.superlikes_usados,
+            meta_votos_pular=jam.meta_votos_pular,
+            duracao_acumulada_segundos=jam.duracao_acumulada_segundos,
+            fonte_deck=jam.fonte_deck,
+            playlist_origem_id=jam.playlist_origem_id,
         )
         self.session.add(model)
         self.session.commit()
@@ -668,6 +778,55 @@ class JamRepository(JamRepositoryPort):
         self.session.commit()
         return True
 
+    def adicionar_participante(self, jam_id: int, usuario_id: int) -> None:
+        participante = (
+            self.session.query(JamParticipanteModel)
+            .filter_by(jam_id=jam_id, usuario_id=usuario_id)
+            .first()
+        )
+        if participante:
+            return
+        self.session.add(JamParticipanteModel(jam_id=jam_id, usuario_id=usuario_id))
+        self.session.commit()
+
+    def eh_participante(self, jam_id: int, usuario_id: int) -> bool:
+        return (
+            self.session.query(JamParticipanteModel)
+            .filter_by(jam_id=jam_id, usuario_id=usuario_id)
+            .first()
+            is not None
+        )
+
+    def registrar_voto_pular(self, jam_id: int, musica_id: int, usuario_id: int) -> int:
+        voto = (
+            self.session.query(JamVotoPularModel)
+            .filter_by(jam_id=jam_id, musica_id=musica_id, usuario_id=usuario_id)
+            .first()
+        )
+        if not voto:
+            self.session.add(
+                JamVotoPularModel(
+                    jam_id=jam_id, musica_id=musica_id, usuario_id=usuario_id
+                )
+            )
+            self.session.commit()
+        return self.contar_votos_pular(jam_id, musica_id)
+
+    def contar_votos_pular(self, jam_id: int, musica_id: int) -> int:
+        return (
+            self.session.query(JamVotoPularModel)
+            .filter_by(jam_id=jam_id, musica_id=musica_id)
+            .count()
+        )
+
+    def limpar_votos_pular(self, jam_id: int, musica_id: int) -> None:
+        (
+            self.session.query(JamVotoPularModel)
+            .filter_by(jam_id=jam_id, musica_id=musica_id)
+            .delete(synchronize_session=False)
+        )
+        self.session.commit()
+
 
 class AvaliacaoRepository(AvaliacaoRepositoryPort):
     """Implementação do repositório de avaliações e comentários."""
@@ -679,6 +838,16 @@ class AvaliacaoRepository(AvaliacaoRepositoryPort):
         model = (
             self.session.query(AvaliacaoComentarioModel)
             .filter(AvaliacaoComentarioModel.avaliacao_id == avaliacao_id)
+            .first()
+        )
+        return _to_avaliacao_entity(model) if model else None
+
+    def buscar_por_usuario_e_musica(
+        self, usuario_id: int, musica_id: int
+    ) -> AvaliacaoComentario | None:
+        model = (
+            self.session.query(AvaliacaoComentarioModel)
+            .filter_by(usuario_id=usuario_id, musica_id=musica_id)
             .first()
         )
         return _to_avaliacao_entity(model) if model else None
@@ -742,3 +911,37 @@ class AvaliacaoRepository(AvaliacaoRepositoryPort):
             .all()
         )
         return [_to_avaliacao_entity(m) for m in models]
+
+    def excluir(self, avaliacao_id: int) -> bool:
+        model = (
+            self.session.query(AvaliacaoComentarioModel)
+            .filter_by(avaliacao_id=avaliacao_id)
+            .first()
+        )
+        if not model:
+            return False
+        self.session.delete(model)
+        self.session.commit()
+        return True
+
+    def curtir(self, avaliacao_id: int, usuario_id: int) -> AvaliacaoComentario:
+        model = (
+            self.session.query(AvaliacaoComentarioModel)
+            .filter_by(avaliacao_id=avaliacao_id)
+            .first()
+        )
+        if not model:
+            return None
+        curtida = (
+            self.session.query(AvaliacaoCurtidaModel)
+            .filter_by(avaliacao_id=avaliacao_id, usuario_id=usuario_id)
+            .first()
+        )
+        if not curtida:
+            self.session.add(
+                AvaliacaoCurtidaModel(avaliacao_id=avaliacao_id, usuario_id=usuario_id)
+            )
+            model.likes_count += 1
+            self.session.commit()
+            self.session.refresh(model)
+        return _to_avaliacao_entity(model)

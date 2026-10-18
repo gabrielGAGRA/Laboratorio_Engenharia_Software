@@ -1,7 +1,7 @@
 """Domain entities for Ribbit platform. Pure Python dataclasses."""
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import date, datetime
 from enum import StrEnum
 
 
@@ -38,6 +38,7 @@ class Usuario:
     generos_bloqueados: str | None = None
     is_admin: bool = False
     criado_em: datetime | None = None
+    data_nascimento: date | None = None
 
     def lista_generos_bloqueados(self) -> list[str]:
         """Retorna lista normalizada de gêneros bloqueados."""
@@ -46,6 +47,30 @@ class Usuario:
         return [
             g.strip().lower() for g in self.generos_bloqueados.split(",") if g.strip()
         ]
+
+    def idade_atual(self, hoje: date | None = None) -> int:
+        """Calcula idade pela data de nascimento ou usa o valor legado."""
+        if not self.data_nascimento:
+            return self.idade
+        hoje = hoje or date.today()
+        return (
+            hoje.year
+            - self.data_nascimento.year
+            - (
+                (hoje.month, hoje.day)
+                < (self.data_nascimento.month, self.data_nascimento.day)
+            )
+        )
+
+    @staticmethod
+    def idade_indica_menor(idade: int) -> bool:
+        """Indica se a idade informada está abaixo da maioridade."""
+        idade_maioridade = 18
+        return idade < idade_maioridade
+
+    def eh_menor_de_idade(self) -> bool:
+        """Indica se o usuário tem menos de 18 anos."""
+        return self.idade_indica_menor(self.idade_atual())
 
 
 @dataclass(slots=True)
@@ -91,6 +116,8 @@ class Playlist:
     is_exportada: bool = False
     criado_em: datetime | None = None
     musicas: list[Musica] = field(default_factory=list)
+    duracao_maxima_segundos: int | None = None
+    filtros_deck: str | None = None
 
 
 @dataclass(slots=True)
@@ -114,6 +141,13 @@ class Jam:
     is_ativa: bool = True
     musica_atual_id: int | None = None
     criado_em: datetime | None = None
+    duracao_minutos: int = 60
+    limite_superlikes: int = 10
+    superlikes_usados: int = 0
+    meta_votos_pular: int = 3
+    duracao_acumulada_segundos: int = 0
+    fonte_deck: str = "livre"
+    playlist_origem_id: int | None = None
 
 
 @dataclass(slots=True)

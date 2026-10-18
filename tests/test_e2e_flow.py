@@ -1,4 +1,4 @@
-"""End-to-End integration test covering the primary user flow of Ribbit V0."""
+"""End-to-end tests for authentication, playlists, family, Jam, and administration."""
 
 import pytest
 from fastapi.testclient import TestClient
@@ -6,18 +6,20 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.application.auth_use_cases import hash_password
 from app.infrastructure.database import Base, get_db
-from app.infrastructure.db_models import MusicaModel, PlanoModel, UsuarioModel
+from app.infrastructure.db_models import MusicaModel
 from app.infrastructure.seed import run_seed
 from app.main import app
 
-# In-memory database for isolated E2E testing
 test_engine = create_engine(
     "sqlite:///:memory:",
     connect_args={"check_same_thread": False},
     poolclass=StaticPool,
 )
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
+ADMIN_EMAIL = "admin@ribbit.example.com"
+ADMIN_PASSWORD = "RibbitLocal2026!"
 
 
 def override_get_db():
@@ -32,7 +34,7 @@ def override_get_db():
 def setup_test_db():
     Base.metadata.create_all(bind=test_engine)
     session = TestingSessionLocal()
-    run_seed(session)
+    run_seed(session, hash_password)
     session.close()
     app.dependency_overrides[get_db] = override_get_db
     yield
@@ -45,284 +47,347 @@ def client():
     return TestClient(app)
 
 
-def test_fluxo_principal_e2e(client):
-    """Testa o fluxo principal ponta a ponta:
-    1. Cadastro / Login
-    2. Descoberta / Swipe
-    3. Criação e Leitura de Playlists
-    4. Perfil e Histórico
-    """
-    # ----------------------------------------------------
-    # PASSO 1: CADASTRO / LOGIN
-    # ----------------------------------------------------
-    # Consulta planos disponíveis para selecionar o Individual
-    resp_planos = client.get("/api/planos")
-    assert resp_planos.status_code == 200
-    planos = resp_planos.json()
-    assert len(planos) >= 3
-    plano_individual = next(p for p in planos if p["nome"] == "Individual")
-
-    # Cadastro
-    cadastro_payload = {
-        "email": "crazyfrog@ribbit.com",
-        "senha": "password123",
-        "nome_exibicao": "Crazy Frog",
-        "idade": 22,
-        "plano_id": plano_individual["plano_id"],
-    }
-    resp_cadastro = client.post("/api/auth/cadastrar", json=cadastro_payload)
-    assert resp_cadastro.status_code == 201
-    usuario = resp_cadastro.json()
-    usuario_id = usuario["usuario_id"]
-    assert usuario["email"] == "crazyfrog@ribbit.com"
-    assert usuario["plano_id"] == plano_individual["plano_id"]
-
-    # Login
-    login_payload = {
-        "email": "crazyfrog@ribbit.com",
-        "senha": "password123",
-    }
-    resp_login = client.post("/api/auth/login", json=login_payload)
-    assert resp_login.status_code == 200
-    assert resp_login.json()["usuario_id"] == usuario_id
-
-    # ----------------------------------------------------
-    # PASSO 2: DESCOBERTA / SWIPE
-    # ----------------------------------------------------
-    # Recebe primeira faixa para descoberta
-    resp_proxima1 = client.get(f"/api/descoberta/proxima?usuario_id={usuario_id}")
-    assert resp_proxima1.status_code == 200
-    musica1 = resp_proxima1.json()
-    assert musica1 is not None
-    musica1_id = musica1["musica_id"]
-
-    # Registra swipe 'curtida' na primeira música
-    resp_swipe1 = client.post(
-        "/api/descoberta/interagir",
+def _cadastrar(client: TestClient, email: str, data_nascimento: str, plano_id: int):
+    resposta = client.post(
+        "/api/auth/cadastrar",
         json={
-            "usuario_id": usuario_id,
-            "musica_id": musica1_id,
-            "acao": "curtida",
+            "email": email,
+            "senha": "password123",
+            "nome_exibicao": "Ribbit Test",
+            "data_nascimento": data_nascimento,
+            "plano_id": plano_id,
         },
     )
-    assert resp_swipe1.status_code == 200
-    assert resp_swipe1.json()["acao"] == "curtida"
+    assert resposta.status_code == 201, resposta.text
+    login = client.post(
+        "/api/auth/login", json={"email": email, "senha": "password123"}
+    )
+    assert login.status_code == 200, login.text
+    return resposta.json(), {"Authorization": f"Bearer {login.json()['access_token']}"}
 
-    # Próxima faixa de descoberta não pode ser a música já interagida
-    resp_proxima2 = client.get(f"/api/descoberta/proxima?usuario_id={usuario_id}")
-    assert resp_proxima2.status_code == 200
-    musica2 = resp_proxima2.json()
-    assert musica2 is not None
-    musica2_id = musica2["musica_id"]
-    assert musica2_id != musica1_id
 
-    # Registra swipe 'amada' na segunda música
-    resp_swipe2 = client.post(
-        "/api/descoberta/interagir",
+def test_auth_blocked_minor_and_bearer_identity(client):
+    planos = client.get("/api/planos").json()
+    free_id = next(plano["plano_id"] for plano in planos if plano["nome"] == "Free")
+
+    cadastro = client.post(
+        "/api/auth/cadastrar",
         json={
-            "usuario_id": usuario_id,
-            "musica_id": musica2_id,
-            "acao": "amada",
+            "email": "minor-direct@ribbit.com",
+            "senha": "password123",
+            "nome_exibicao": "Minor",
+            "data_nascimento": "2012-01-01",
         },
     )
-    assert resp_swipe2.status_code == 200
-    assert resp_swipe2.json()["acao"] == "amada"
+    assert cadastro.status_code == 400
 
-    # ----------------------------------------------------
-    # PASSO 3: CRIAÇÃO E LEITURA DE PLAYLISTS
-    # ----------------------------------------------------
-    # Cria deck de playlist por parâmetros
-    deck_payload = {
-        "usuario_id": usuario_id,
-        "nome": "Minha Vibe Matinal",
-        "duracao_minutos": 10,
-        "genero": "Pop",
-        "descricao": "Playlist gerada no Ribbit",
-    }
-    resp_deck = client.post("/api/playlists/deck", json=deck_payload)
-    assert resp_deck.status_code == 201
-    playlist_criada = resp_deck.json()
-    playlist_id = playlist_criada["playlist_id"]
-    assert playlist_criada["nome"] == "Minha Vibe Matinal"
+    user, headers = _cadastrar(client, "adult@ribbit.com", "1990-01-01", free_id)
+    assert client.get("/api/perfil/me").status_code == 401
+    profile = client.get("/api/perfil/me?usuario_id=999999", headers=headers)
+    assert profile.status_code == 200
+    assert profile.json()["usuario"]["usuario_id"] == user["usuario_id"]
 
-    # Adiciona uma nova música na playlist via swipe
-    resp_add = client.post(
-        f"/api/playlists/{playlist_id}/swipe-add?usuario_id={usuario_id}",
-        json={"musica_id": musica1_id},
+
+def test_playlist_deck_and_owner_only_writes(client):
+    planos = client.get("/api/planos").json()
+    individual_id = next(
+        plano["plano_id"] for plano in planos if plano["nome"] == "Individual"
     )
-    assert resp_add.status_code == 200
-    assert resp_add.json()["sucesso"] is True
-
-    # Consulta a biblioteca de playlists do usuário
-    resp_biblioteca = client.get(f"/api/playlists?usuario_id={usuario_id}")
-    assert resp_biblioteca.status_code == 200
-    playlists_usuario = resp_biblioteca.json()
-    assert len(playlists_usuario) >= 1
-    assert any(p["playlist_id"] == playlist_id for p in playlists_usuario)
-
-    # ----------------------------------------------------
-    # PASSO 4: PERFIL E HISTÓRICO
-    # ----------------------------------------------------
-    # Consulta dados do perfil
-    resp_perfil = client.get(f"/api/perfil/me?usuario_id={usuario_id}")
-    assert resp_perfil.status_code == 200
-    perfil_dados = resp_perfil.json()
-    assert perfil_dados["usuario"]["email"] == "crazyfrog@ribbit.com"
-    assert perfil_dados["plano"]["nome"] == "Individual"
-
-    # Consulta histórico de interações (curtidas e salvas)
-    resp_historico = client.get(f"/api/perfil/historico?usuario_id={usuario_id}")
-    assert resp_historico.status_code == 200
-    historico = resp_historico.json()
-    assert len(historico) >= 2
-    acoes = [item["acao"] for item in historico]
-    assert "curtida" in acoes
-    assert "amada" in acoes
-
-
-def test_admin_atualiza_restricao_de_menores(client):
-    db = TestingSessionLocal()
-    plano = db.query(PlanoModel).filter(PlanoModel.nome == "Free").first()
-    musica = db.query(MusicaModel).filter(MusicaModel.titulo == "Shape of You").first()
-    assert plano is not None
-    assert musica is not None
-
-    admin = UsuarioModel(
-        email="admin-moderacao@ribbit.com",
-        senha_hash="nao-utilizado-no-teste",
-        nome_exibicao="Admin",
-        idade=30,
-        plano_id=plano.plano_id,
-        is_admin=True,
+    _, headers = _cadastrar(
+        client, "playlist-owner@ribbit.com", "1988-04-05", individual_id
     )
-    db.add(admin)
-    db.commit()
-    db.refresh(admin)
-    admin_id = admin.usuario_id
-    musica_id = musica.musica_id
-    db.close()
-
-    bloqueio = client.put(
-        f"/api/admin/musicas/{musica_id}/restricao-menores",
-        headers={"X-Admin-Id": str(admin_id)},
-        json={"bloqueado_para_menores": True},
-    )
-    assert bloqueio.status_code == 200
-    assert bloqueio.json() == {
-        "musica_id": musica_id,
-        "bloqueado_para_menores": True,
-    }
-
-    desbloqueio = client.put(
-        f"/api/admin/musicas/{musica_id}/restricao-menores",
-        headers={"X-Admin-Id": str(admin_id)},
-        json={"bloqueado_para_menores": False},
-    )
-    assert desbloqueio.status_code == 200
-    assert desbloqueio.json()["bloqueado_para_menores"] is False
-
-
-def test_restricao_etaria_em_busca_playlist_e_jam(client):
-    db = TestingSessionLocal()
-    plano = db.query(PlanoModel).filter(PlanoModel.nome == "Free").first()
-    musica_restrita = (
-        db.query(MusicaModel).filter(MusicaModel.titulo == "Rap God").first()
-    )
-    assert plano is not None
-    assert musica_restrita is not None
-    musica_restrita.bloqueado_para_menores = True
-
-    adulto = UsuarioModel(
-        email="adulto-jam-restricao@ribbit.com",
-        senha_hash="nao-utilizado-no-teste",
-        nome_exibicao="Adulto",
-        idade=30,
-        plano_id=plano.plano_id,
-    )
-    menor = UsuarioModel(
-        email="menor-restricao@ribbit.com",
-        senha_hash="nao-utilizado-no-teste",
-        nome_exibicao="Menor",
-        idade=16,
-        plano_id=plano.plano_id,
-    )
-    db.add(adulto)
-    db.add(menor)
-    db.commit()
-    db.refresh(adulto)
-    db.refresh(menor)
-    usuario_id = menor.usuario_id
-    adulto_id = adulto.usuario_id
-    musica_id = musica_restrita.musica_id
-    db.close()
-
-    busca = client.get(f"/api/musicas/buscar?usuario_id={usuario_id}&termo=Rap%20God")
-    assert busca.status_code == 200
-    assert all(musica["musica_id"] != musica_id for musica in busca.json())
-
     deck = client.post(
         "/api/playlists/deck",
-        json={"usuario_id": usuario_id, "nome": "Playlist do menor"},
+        headers=headers,
+        json={"nome": "Pop curta", "duracao_minutos": 5, "genero": "Pop"},
     )
-    assert deck.status_code == 201
+    assert deck.status_code == 201, deck.text
     playlist_id = deck.json()["playlist_id"]
-
-    adicionar = client.post(
-        f"/api/playlists/{playlist_id}/swipe-add?usuario_id={usuario_id}",
-        json={"musica_id": musica_id},
+    assert deck.json()["musicas"] == []
+    first_page = client.get(
+        f"/api/playlists/{playlist_id}/deck?limite=20", headers=headers
     )
-    assert adicionar.status_code == 400
-    assert "bloqueada para usuários menores" in adicionar.json()["mensagem"]
+    assert first_page.status_code == 200
+    assert first_page.json()["items"]
+    assert all(track["duracao_segundos"] <= 300 for track in first_page.json()["items"])
+
+    track = first_page.json()["items"][0]
+    added = client.post(
+        f"/api/playlists/{playlist_id}/swipe-add",
+        headers=headers,
+        json={"musica_id": track["musica_id"], "acao": "superlike"},
+    )
+    assert added.status_code == 200, added.text
+    remaining_deck = client.get(f"/api/playlists/{playlist_id}/deck", headers=headers)
+    assert remaining_deck.status_code == 200
+    assert track["musica_id"] not in {
+        candidate["musica_id"] for candidate in remaining_deck.json()["items"]
+    }
+    other_suggestion = next(
+        candidate
+        for candidate in first_page.json()["items"]
+        if candidate["musica_id"] != track["musica_id"]
+    )
+    over_duration = client.post(
+        f"/api/playlists/{playlist_id}/swipe-add",
+        headers=headers,
+        json={"musica_id": other_suggestion["musica_id"], "acao": "curtida"},
+    )
+    assert over_duration.status_code == 400
+    detail = client.get(f"/api/playlists/{playlist_id}", headers=headers)
+    assert detail.status_code == 200
+    assert detail.json()["duracao_total_segundos"] == track["duracao_segundos"]
+
+    other, other_headers = _cadastrar(
+        client, "playlist-other@ribbit.com", "1985-03-02", individual_id
+    )
+    assert other["usuario_id"] != detail.json()["usuario_id"]
+    denied = client.delete(f"/api/playlists/{playlist_id}", headers=other_headers)
+    assert denied.status_code == 403
+
+
+def test_family_minor_is_filtered_and_jam_votes_advance_automatically(client):
+    planos = client.get("/api/planos").json()
+    family_id = next(
+        plano["plano_id"] for plano in planos if plano["nome"] == "Família"
+    )
+    _, host_headers = _cadastrar(
+        client, "family-owner@ribbit.com", "1980-05-01", family_id
+    )
+    member = client.post(
+        "/api/perfil/familia/membros",
+        headers=host_headers,
+        json={
+            "email": "family-child@ribbit.com",
+            "senha": "password123",
+            "nome_exibicao": "Child Profile",
+            "data_nascimento": "2012-02-01",
+        },
+    )
+    assert member.status_code == 200, member.text
+    child_login = client.post(
+        "/api/auth/login",
+        json={"email": "family-child@ribbit.com", "senha": "password123"},
+    )
+    child_headers = {"Authorization": f"Bearer {child_login.json()['access_token']}"}
+
+    room = client.post(
+        "/api/jams",
+        headers=host_headers,
+        json={
+            "nome_sala": "Family Jam",
+            "duracao_minutos": 60,
+            "limite_superlikes": 1,
+            "meta_votos_pular": 2,
+        },
+    )
+    assert room.status_code == 201, room.text
+    jam = room.json()
+    joined = client.post(
+        "/api/jams/entrar",
+        headers=child_headers,
+        json={"codigo_sala": jam["codigo_sala"]},
+    )
+    assert joined.status_code == 200
+    child_deck = client.get(
+        f"/api/jams/{jam['jam_id']}/deck-adicionar", headers=child_headers
+    )
+    assert child_deck.status_code == 200
+    assert all(track["titulo"] != "Rap God" for track in child_deck.json()["items"])
+
+    with TestingSessionLocal() as session:
+        musicas = {
+            row.titulo: row.musica_id
+            for row in session.query(MusicaModel)
+            .filter(MusicaModel.titulo.in_(["Shape of You", "Blinding Lights"]))
+            .all()
+        }
+    first = musicas["Shape of You"]
+    second = musicas["Blinding Lights"]
+    first_add = client.post(
+        f"/api/jams/{jam['jam_id']}/interagir-deck",
+        headers=host_headers,
+        json={"musica_id": first, "acao": "like"},
+    )
+    assert first_add.status_code == 200, first_add.text
+    second_add = client.post(
+        f"/api/jams/{jam['jam_id']}/interagir-deck",
+        headers=host_headers,
+        json={"musica_id": second, "acao": "superlike"},
+    )
+    assert second_add.status_code == 200, second_add.text
+    over_limit = client.post(
+        f"/api/jams/{jam['jam_id']}/interagir-deck",
+        headers=host_headers,
+        json={"musica_id": first, "acao": "superlike"},
+    )
+    assert over_limit.status_code == 400
+
+    first_vote = client.post(
+        f"/api/jams/{jam['jam_id']}/votar-pular",
+        headers=host_headers,
+        json={},
+    )
+    assert first_vote.status_code == 200, first_vote.text
+    repeated_vote = client.post(
+        f"/api/jams/{jam['jam_id']}/votar-pular",
+        headers=host_headers,
+        json={},
+    )
+    assert repeated_vote.json()["votos"] == 1
+    second_vote = client.post(
+        f"/api/jams/{jam['jam_id']}/votar-pular",
+        headers=child_headers,
+        json={},
+    )
+    assert second_vote.status_code == 200
+    assert second_vote.json()["avancou"] is True
+    state = client.get(f"/api/jams/{jam['jam_id']}/estado", headers=host_headers)
+    assert state.json()["jam"]["musica_atual_id"] == second
+
+
+def test_rejected_tracks_are_skipped_and_playlist_and_jam_decks_are_large(client):
+    plans = client.get("/api/planos").json()
+    individual_id = next(
+        plan["plano_id"] for plan in plans if plan["nome"] == "Individual"
+    )
+    _, headers = _cadastrar(
+        client, "large-deck-user@ribbit.com", "1991-06-07", individual_id
+    )
+
+    with TestingSessionLocal() as session:
+        rejected = (
+            session.query(MusicaModel)
+            .filter(MusicaModel.titulo == "Blinding Lights")
+            .first()
+        )
+        assert rejected is not None
+        rejected_id = rejected.musica_id
+        session.add_all(
+            [
+                MusicaModel(
+                    titulo=f"Deck Track {index}",
+                    artista="Ribbit Test",
+                    duracao_segundos=180,
+                    genero="Test",
+                    bloqueado_para_menores=False,
+                    is_deleted=False,
+                )
+                for index in range(60)
+            ]
+        )
+        session.commit()
+
+    rejected_response = client.post(
+        "/api/descoberta/interagir",
+        headers=headers,
+        json={"musica_id": rejected_id, "acao": "rejeitada"},
+    )
+    assert rejected_response.status_code == 200, rejected_response.text
+
+    playlist = client.post(
+        "/api/playlists/deck",
+        headers=headers,
+        json={"nome": "Alternativas"},
+    )
+    assert playlist.status_code == 201, playlist.text
+    playlist_id = playlist.json()["playlist_id"]
+    playlist_suggestions = client.get(
+        f"/api/playlists/{playlist_id}/deck?limite=20", headers=headers
+    )
+    assert playlist_suggestions.status_code == 200
+    playlist_ids = {
+        track["musica_id"] for track in playlist_suggestions.json()["items"]
+    }
+    assert rejected_id not in playlist_ids
+    assert len(playlist_ids) == 20
+    assert playlist_suggestions.json()["has_more"] is True
+    next_playlist_page = client.get(
+        f"/api/playlists/{playlist_id}/deck?limite=20"
+        f"&cursor_id={playlist_suggestions.json()['next_cursor']}",
+        headers=headers,
+    )
+    assert next_playlist_page.status_code == 200
+    next_playlist_ids = {
+        track["musica_id"] for track in next_playlist_page.json()["items"]
+    }
+    assert len(next_playlist_ids) == 20
+    assert playlist_ids.isdisjoint(next_playlist_ids)
 
     jam = client.post(
         "/api/jams",
-        json={"host_usuario_id": adulto_id, "nome_sala": "Jam com restrição"},
+        headers=headers,
+        json={"nome_sala": "Alternativas", "duracao_minutos": 600},
     )
-    assert jam.status_code == 201
+    assert jam.status_code == 201, jam.text
+    jam_suggestions = client.get(
+        f"/api/jams/{jam.json()['jam_id']}/deck-adicionar?limite=20",
+        headers=headers,
+    )
+    assert jam_suggestions.status_code == 200
+    jam_ids = {track["musica_id"] for track in jam_suggestions.json()["items"]}
+    assert rejected_id not in jam_ids
+    assert len(jam_ids) == 20
+    assert jam_suggestions.json()["has_more"] is True
+    next_jam_page = client.get(
+        f"/api/jams/{jam.json()['jam_id']}/deck-adicionar?limite=20"
+        f"&cursor_id={jam_suggestions.json()['next_cursor']}",
+        headers=headers,
+    )
+    assert next_jam_page.status_code == 200
+    next_jam_ids = {track["musica_id"] for track in next_jam_page.json()["items"]}
+    assert len(next_jam_ids) == 20
+    assert jam_ids.isdisjoint(next_jam_ids)
 
-    adulto_vota = client.post(
-        f"/api/jams/{jam.json()['jam_id']}/votar",
-        json={"usuario_id": adulto_id, "musica_id": musica_id},
-    )
-    assert adulto_vota.status_code == 200
 
-    votar = client.post(
-        f"/api/jams/{jam.json()['jam_id']}/votar",
-        json={"usuario_id": usuario_id, "musica_id": musica_id},
+def test_blocked_genre_does_not_hide_or_prevent_music_and_review_actions(client):
+    plans = client.get("/api/planos").json()
+    individual_id = next(
+        plan["plano_id"] for plan in plans if plan["nome"] == "Individual"
     )
-    assert votar.status_code == 400
-    assert "bloqueada para usuários menores" in votar.json()["mensagem"]
+    _, headers = _cadastrar(
+        client, "blocked-genre-user@ribbit.com", "1992-09-10", individual_id
+    )
+    blocked = client.put(
+        "/api/perfil/generos-bloqueados",
+        headers=headers,
+        json={"generos_bloqueados": ["Rock"]},
+    )
+    assert blocked.status_code == 200, blocked.text
 
-    estado = client.get(
-        f"/api/jams/{jam.json()['jam_id']}/estado?usuario_id={usuario_id}"
+    search = client.get(
+        "/api/musicas/buscar?genero=Rock",
+        headers=headers,
     )
-    assert estado.status_code == 200
-    assert estado.json()["fila"] == []
+    assert search.status_code == 200
+    queen = next(
+        track for track in search.json() if track["titulo"] == "Bohemian Rhapsody"
+    )
 
-    avancar = client.post(
-        f"/api/jams/{jam.json()['jam_id']}/avancar?solicitante_usuario_id={adulto_id}"
+    favorite = client.post(
+        f"/api/reviews/{queen['musica_id']}/curtir-busca",
+        headers=headers,
+        json={},
     )
-    assert avancar.status_code == 200
+    assert favorite.status_code == 200, favorite.text
+    review = client.post(
+        "/api/reviews",
+        headers=headers,
+        json={
+            "musica_id": queen["musica_id"],
+            "nota": 5,
+            "texto": "Great song",
+        },
+    )
+    assert review.status_code == 201, review.text
 
-    estado_atual = client.get(
-        f"/api/jams/{jam.json()['jam_id']}/estado?usuario_id={usuario_id}"
-    )
-    assert estado_atual.status_code == 200
-    assert estado_atual.json()["musica_atual"] is None
-    assert estado_atual.json()["jam"]["musica_atual_id"] is None
 
-    db = TestingSessionLocal()
-    musica_restrita = (
-        db.query(MusicaModel).filter(MusicaModel.musica_id == musica_id).first()
+def test_admin_seed_uses_common_login_and_admin_role(client):
+    login = client.post(
+        "/api/auth/login",
+        json={"email": ADMIN_EMAIL, "senha": ADMIN_PASSWORD},
     )
-    assert musica_restrita is not None
-    musica_restrita.bloqueado_para_menores = False
-    musica_restrita.is_deleted = True
-    db.commit()
-    db.close()
-
-    estado_excluida = client.get(
-        f"/api/jams/{jam.json()['jam_id']}/estado?usuario_id={usuario_id}"
-    )
-    assert estado_excluida.status_code == 200
-    assert estado_excluida.json()["musica_atual"] is None
+    assert login.status_code == 200, login.text
+    token_headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+    assert client.get("/api/admin/dashboard", headers=token_headers).status_code == 200
+    assert client.get("/api/admin/dashboard").status_code == 401

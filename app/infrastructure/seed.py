@@ -1,11 +1,16 @@
 """Database seed script for default plans and sample songs."""
 
+import os
+from collections.abc import Callable
+
 from sqlalchemy.orm import Session
 
-from app.infrastructure.db_models import MusicaModel, PlanoModel
+from app.infrastructure.db_models import MusicaModel, PlanoModel, UsuarioModel
 
 
-def run_seed(session: Session) -> None:
+def run_seed(
+    session: Session, hash_admin_password: Callable[[str], str] | None = None
+) -> None:
     """Verifica e popula planos e músicas iniciais caso não existam."""
     # 1. Planos padrão
     planos_padrao = [
@@ -28,6 +33,38 @@ def run_seed(session: Session) -> None:
             )
 
     session.commit()
+
+    if hash_admin_password:
+        admin_email = os.getenv(
+            "RIBBIT_ADMIN_EMAIL", "admin@ribbit.example.com"
+        ).lower()
+        admin_password = os.getenv("RIBBIT_ADMIN_PASSWORD", "RibbitLocal2026!")
+        admin = (
+            session.query(UsuarioModel)
+            .filter(UsuarioModel.email == admin_email)
+            .first()
+        )
+        if admin and not admin.is_admin:
+            raise RuntimeError(
+                f"A conta de seed {admin_email} existe sem papel administrativo."
+            )
+        if not admin:
+            plano_free = (
+                session.query(PlanoModel).filter(PlanoModel.nome == "Free").first()
+            )
+            if not plano_free:
+                raise RuntimeError("Plano Free não encontrado para criar o admin.")
+            session.add(
+                UsuarioModel(
+                    email=admin_email,
+                    senha_hash=hash_admin_password(admin_password),
+                    nome_exibicao="Administrador Local",
+                    idade=30,
+                    plano_id=plano_free.plano_id,
+                    is_admin=True,
+                )
+            )
+            session.commit()
 
     # 2. Músicas padrão de amostra
     musicas_padrao = [
