@@ -1,11 +1,8 @@
 """Persistence port for users."""
 
-from __future__ import annotations
+from typing import Protocol, runtime_checkable
 
-from typing import TYPE_CHECKING, Protocol, runtime_checkable
-
-if TYPE_CHECKING:
-    from app.domain.models import User
+lazy from app.domain.models import User
 
 
 @runtime_checkable

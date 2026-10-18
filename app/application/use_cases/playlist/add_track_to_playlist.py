@@ -1,58 +1,51 @@
 """Use case for adding an individual track to a playlist."""
 
-from typing import TYPE_CHECKING
+from dataclasses import dataclass
 
-from app.application.dtos.playlist_dtos import (
-    AddTrackToPlaylistInput,
-    PlaylistResponse,
-)
 from app.domain.exceptions import (
     BusinessRuleViolationError,
     EntityNotFoundError,
     PermissionDeniedError,
 )
+lazy from app.application.commands.playlist_commands import (
+    AddTrackToPlaylistCommand,
+)
+lazy from app.application.ports.repositories.playlist_repository import (
+    PlaylistRepositoryPort,
+)
+lazy from app.application.ports.repositories.track_repository import TrackRepositoryPort
+lazy from app.application.ports.repositories.user_repository import UserRepositoryPort
+lazy from app.domain.models.playlist import Playlist
 
-if TYPE_CHECKING:
-    from app.application.ports.repositories.playlist_repository import (
-        PlaylistRepositoryPort,
-    )
-    from app.application.ports.repositories.track_repository import TrackRepositoryPort
-    from app.application.ports.repositories.user_repository import UserRepositoryPort
 
-
+@dataclass(slots=True, frozen=True)
 class AddTrackToPlaylistUseCase:
     """Adds a track to an aggregate playlist after validating ownership and age permissions."""
 
-    def __init__(
-        self,
-        user_repo: UserRepositoryPort,
-        track_repo: TrackRepositoryPort,
-        playlist_repo: PlaylistRepositoryPort,
-    ) -> None:
-        self._user_repo = user_repo
-        self._track_repo = track_repo
-        self._playlist_repo = playlist_repo
+    user_repo: UserRepositoryPort
+    track_repo: TrackRepositoryPort
+    playlist_repo: PlaylistRepositoryPort
 
-    def execute(self, input_dto: AddTrackToPlaylistInput) -> PlaylistResponse:
-        user = self._user_repo.find_by_id(input_dto.user_id)
+    def execute(self, command: AddTrackToPlaylistCommand) -> Playlist:
+        user = self.user_repo.find_by_id(command.user_id)
         if not user:
-            raise EntityNotFoundError(f"User with ID {input_dto.user_id} not found.")
+            raise EntityNotFoundError(f"User with ID {command.user_id} not found.")
 
-        playlist = self._playlist_repo.find_by_id(input_dto.playlist_id)
+        playlist = self.playlist_repo.find_by_id(command.playlist_id)
         if not playlist:
             raise EntityNotFoundError(
-                f"Playlist with ID {input_dto.playlist_id} not found."
+                f"Playlist with ID {command.playlist_id} not found."
             )
 
-        if playlist.user_id != input_dto.user_id:
+        if not playlist.is_owned_by(command.user_id):
             raise PermissionDeniedError(
                 "Access denied: playlist does not belong to this user."
             )
 
-        track = self._track_repo.find_by_id(input_dto.track_id)
+        track = self.track_repo.find_by_id(command.track_id)
         if not track or track.is_deleted:
             raise EntityNotFoundError(
-                f"Track with ID {input_dto.track_id} not found or inactive."
+                f"Track with ID {command.track_id} not found or inactive."
             )
 
         if not user.can_listen(track):
@@ -61,5 +54,4 @@ class AddTrackToPlaylistUseCase:
             )
 
         playlist.add_track(track)
-        saved = self._playlist_repo.save(playlist)
-        return PlaylistResponse.from_domain(saved)
+        return self.playlist_repo.save(playlist)

@@ -1,18 +1,10 @@
-"""Data transfer objects for administrative use cases."""
+"""Projection results for administrative use cases."""
 
 from dataclasses import dataclass
 
 
 @dataclass(slots=True, frozen=True, kw_only=True)
-class UpdateSubscriptionPlanInput:
-    plan_id: int
-    new_price: float | None = None
-    new_name: str | None = None
-    max_profiles: int | None = None
-
-
-@dataclass(slots=True, frozen=True, kw_only=True)
-class UserPlanSummaryResponse:
+class UserPlanSummaryResult:
     user_id: int | None
     email: str
     display_name: str
@@ -22,7 +14,7 @@ class UserPlanSummaryResponse:
 
 
 @dataclass(slots=True, frozen=True, kw_only=True)
-class ExecutiveDashboardResponse:
+class ExecutiveDashboardResult:
     total_users: int
     estimated_net_revenue: float
     users_by_plan: dict[str, int]
@@ -30,13 +22,13 @@ class ExecutiveDashboardResponse:
 
 
 @dataclass(slots=True, frozen=True, kw_only=True)
-class AudienceReportResponse:
+class AudienceReportResult:
     total_users: int
     total_tracks: int
     active_tracks: int
 
 
 @dataclass(slots=True, frozen=True, kw_only=True)
-class AuditLogEntryResponse:
+class AuditLogEntryResult:
     event: str
     status: str

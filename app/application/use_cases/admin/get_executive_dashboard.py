@@ -1,28 +1,22 @@
 """Use case for calculating executive metrics and financial dashboard."""
 
-from typing import TYPE_CHECKING
+from dataclasses import dataclass
 
-from app.application.dtos.admin_dtos import ExecutiveDashboardResponse
-
-if TYPE_CHECKING:
-    from app.application.ports.repositories.plan_repository import PlanRepositoryPort
-    from app.application.ports.repositories.user_repository import UserRepositoryPort
+from app.application.dtos.admin_dtos import ExecutiveDashboardResult
+lazy from app.application.ports.repositories.plan_repository import PlanRepositoryPort
+lazy from app.application.ports.repositories.user_repository import UserRepositoryPort
 
 
+@dataclass(slots=True, frozen=True)
 class GetExecutiveDashboardUseCase:
     """Calculates financial metrics and subscriber distribution."""
 
-    def __init__(
-        self,
-        user_repo: UserRepositoryPort,
-        plan_repo: PlanRepositoryPort,
-    ) -> None:
-        self._user_repo = user_repo
-        self._plan_repo = plan_repo
+    user_repo: UserRepositoryPort
+    plan_repo: PlanRepositoryPort
 
-    def execute(self) -> ExecutiveDashboardResponse:
-        users = self._user_repo.list_all()
-        plans = self._plan_repo.list_all()
+    def execute(self) -> ExecutiveDashboardResult:
+        users = self.user_repo.list_all()
+        plans = self.plan_repo.list_all()
         plan_map = {p.plan_id: p for p in plans if p.plan_id is not None}
 
         total_revenue = 0.0
@@ -39,7 +33,7 @@ class GetExecutiveDashboardUseCase:
                         revenue_by_plan.get(plan.name, 0.0) + plan.monthly_price
                     )
 
-        return ExecutiveDashboardResponse(
+        return ExecutiveDashboardResult(
             total_users=len(users),
             estimated_net_revenue=round(total_revenue, 2),
             users_by_plan=users_by_plan,

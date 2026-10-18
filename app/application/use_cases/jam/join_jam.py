@@ -1,23 +1,21 @@
 """Use case for joining an existing Jam session via room code."""
 
-from typing import TYPE_CHECKING
+from dataclasses import dataclass
 
-from app.application.dtos.jam_dtos import JamResponse
 from app.domain.exceptions import EntityNotFoundError
+lazy from app.application.ports.repositories.jam_repository import JamRepositoryPort
+lazy from app.domain.models.jam import Jam
 
-if TYPE_CHECKING:
-    from app.application.ports.repositories.jam_repository import JamRepositoryPort
 
-
+@dataclass(slots=True, frozen=True)
 class JoinJamUseCase:
     """Finds an active Jam session by its unique invitation room code."""
 
-    def __init__(self, jam_repo: JamRepositoryPort) -> None:
-        self._jam_repo = jam_repo
+    jam_repo: JamRepositoryPort
 
-    def execute(self, room_code: str) -> JamResponse:
-        jam = self._jam_repo.find_by_code(room_code.strip().upper())
+    def execute(self, room_code: str) -> Jam:
+        jam = self.jam_repo.find_by_code(room_code.strip().upper())
         if not jam or not jam.is_active:
             raise EntityNotFoundError("Jam room not found or inactive.")
 
-        return JamResponse.from_domain(jam)
+        return jam

@@ -1,38 +1,34 @@
 """Use case for updating display name or password of a user."""
 
-from typing import TYPE_CHECKING
+from dataclasses import dataclass
 
-from app.application.dtos.user_dtos import UpdateProfileInput, UserResponse
 from app.domain.exceptions import EntityNotFoundError
+lazy from app.application.commands.user_commands import UpdateProfileCommand
+lazy from app.application.ports.repositories.user_repository import UserRepositoryPort
+lazy from app.application.ports.services.password_hasher import PasswordHasherPort
+lazy from app.domain.models.user import User
 
-if TYPE_CHECKING:
-    from app.application.ports.repositories.user_repository import UserRepositoryPort
-    from app.application.ports.services.password_hasher import PasswordHasherPort
 
-
+@dataclass(slots=True, frozen=True)
 class UpdateProfileUseCase:
     """Updates user profile attributes such as display name and password."""
 
-    def __init__(
-        self,
-        user_repo: UserRepositoryPort,
-        password_hasher: PasswordHasherPort,
-    ) -> None:
-        self._user_repo = user_repo
-        self._password_hasher = password_hasher
+    user_repo: UserRepositoryPort
+    password_hasher: PasswordHasherPort
 
-    def execute(self, input_dto: UpdateProfileInput) -> UserResponse:
-        user = self._user_repo.find_by_id(input_dto.user_id)
+    def execute(self, command: UpdateProfileCommand) -> User:
+        user = self.user_repo.find_by_id(command.user_id)
         if not user:
-            raise EntityNotFoundError(f"User with ID {input_dto.user_id} not found.")
+            raise EntityNotFoundError(f"User with ID {command.user_id} not found.")
 
-        if input_dto.display_name:
-            user.display_name = input_dto.display_name.strip()
+        password_hash = (
+            self.password_hasher.hash_password(command.new_password)
+            if command.new_password
+            else None
+        )
+        user.update_profile(
+            display_name=command.display_name,
+            password_hash=password_hash,
+        )
 
-        if input_dto.new_password:
-            user.password_hash = self._password_hasher.hash_password(
-                input_dto.new_password
-            )
-
-        saved = self._user_repo.save(user)
-        return UserResponse.from_domain(saved)
+        return self.user_repo.save(user)

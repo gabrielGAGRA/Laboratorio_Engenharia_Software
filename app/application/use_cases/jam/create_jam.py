@@ -1,35 +1,28 @@
 """Use case for creating a collaborative Jam session."""
 
-from typing import TYPE_CHECKING
+from dataclasses import dataclass
 
-from app.application.dtos.jam_dtos import CreateJamInput, JamResponse
 from app.domain.exceptions import EntityNotFoundError
 from app.domain.models.jam import Jam
+lazy from app.application.commands.jam_commands import CreateJamCommand
+lazy from app.application.ports.repositories.jam_repository import JamRepositoryPort
+lazy from app.application.ports.repositories.user_repository import UserRepositoryPort
 
-if TYPE_CHECKING:
-    from app.application.ports.repositories.jam_repository import JamRepositoryPort
-    from app.application.ports.repositories.user_repository import UserRepositoryPort
 
-
+@dataclass(slots=True, frozen=True)
 class CreateJamUseCase:
     """Creates a new collaborative Jam session with a unique room code."""
 
-    def __init__(
-        self,
-        jam_repo: JamRepositoryPort,
-        user_repo: UserRepositoryPort,
-    ) -> None:
-        self._jam_repo = jam_repo
-        self._user_repo = user_repo
+    jam_repo: JamRepositoryPort
+    user_repo: UserRepositoryPort
 
-    def execute(self, input_dto: CreateJamInput) -> JamResponse:
-        host = self._user_repo.find_by_id(input_dto.host_user_id)
+    def execute(self, command: CreateJamCommand) -> Jam:
+        host = self.user_repo.find_by_id(command.host_user_id)
         if not host:
-            raise EntityNotFoundError(f"Host user {input_dto.host_user_id} not found.")
+            raise EntityNotFoundError(f"Host user {command.host_user_id} not found.")
 
         jam = Jam.create(
-            host_user_id=input_dto.host_user_id,
-            room_name=input_dto.room_name.strip(),
+            host_user_id=command.host_user_id,
+            room_name=command.room_name.strip(),
         )
-        saved = self._jam_repo.save(jam)
-        return JamResponse.from_domain(saved)
+        return self.jam_repo.save(jam)

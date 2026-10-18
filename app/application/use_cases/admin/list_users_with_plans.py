@@ -1,35 +1,29 @@
 """Use case for listing users and their assigned subscription plans."""
 
-from typing import TYPE_CHECKING
+from dataclasses import dataclass
 
-from app.application.dtos.admin_dtos import UserPlanSummaryResponse
-
-if TYPE_CHECKING:
-    from app.application.ports.repositories.plan_repository import PlanRepositoryPort
-    from app.application.ports.repositories.user_repository import UserRepositoryPort
+from app.application.dtos.admin_dtos import UserPlanSummaryResult
+lazy from app.application.ports.repositories.plan_repository import PlanRepositoryPort
+lazy from app.application.ports.repositories.user_repository import UserRepositoryPort
 
 
+@dataclass(slots=True, frozen=True)
 class ListUsersWithPlansUseCase:
     """Lists users alongside their active plan names for administrative management."""
 
-    def __init__(
-        self,
-        user_repo: UserRepositoryPort,
-        plan_repo: PlanRepositoryPort,
-    ) -> None:
-        self._user_repo = user_repo
-        self._plan_repo = plan_repo
+    user_repo: UserRepositoryPort
+    plan_repo: PlanRepositoryPort
 
-    def execute(self) -> list[UserPlanSummaryResponse]:
-        users = self._user_repo.list_all()
+    def execute(self) -> list[UserPlanSummaryResult]:
+        users = self.user_repo.list_all()
         plans = {
             p.plan_id: p.name
-            for p in self._plan_repo.list_all()
+            for p in self.plan_repo.list_all()
             if p.plan_id is not None
         }
 
         return [
-            UserPlanSummaryResponse(
+            UserPlanSummaryResult(
                 user_id=u.user_id,
                 email=u.email,
                 display_name=u.display_name,

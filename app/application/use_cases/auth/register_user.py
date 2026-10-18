@@ -1,56 +1,48 @@
 """Use case for registering a new platform user."""
 
-from typing import TYPE_CHECKING
+from dataclasses import dataclass
 
-from app.application.dtos.user_dtos import UserResponse
 from app.domain.exceptions import DuplicateEntityError, EntityNotFoundError
-from app.domain.models.user import User
+lazy from app.application.commands.auth_commands import RegisterUserCommand
+lazy from app.application.ports.repositories.plan_repository import PlanRepositoryPort
+lazy from app.application.ports.repositories.user_repository import UserRepositoryPort
+lazy from app.application.ports.services.password_hasher import PasswordHasherPort
+lazy from app.domain.models.plan import Plan
+lazy from app.domain.models.user import User
 
-if TYPE_CHECKING:
-    from app.application.dtos.auth_dtos import RegisterUserInput
-    from app.application.ports.repositories.plan_repository import PlanRepositoryPort
-    from app.application.ports.repositories.user_repository import UserRepositoryPort
-    from app.application.ports.services.password_hasher import PasswordHasherPort
 
-
+@dataclass(slots=True, frozen=True)
 class RegisterUserUseCase:
     """Coordinates registration of a new user account."""
 
-    def __init__(
-        self,
-        user_repo: UserRepositoryPort,
-        plan_repo: PlanRepositoryPort,
-        password_hasher: PasswordHasherPort,
-    ) -> None:
-        self._user_repo = user_repo
-        self._plan_repo = plan_repo
-        self._password_hasher = password_hasher
+    user_repo: UserRepositoryPort
+    plan_repo: PlanRepositoryPort
+    password_hasher: PasswordHasherPort
 
-    def execute(self, input_dto: RegisterUserInput) -> UserResponse:
-        existing = self._user_repo.find_by_email(input_dto.email)
+    def execute(self, command: RegisterUserCommand) -> User:
+        existing = self.user_repo.find_by_email(command.email)
         if existing:
-            raise DuplicateEntityError(f"Email {input_dto.email} is already in use.")
+            raise DuplicateEntityError(f"Email {command.email} is already in use.")
 
-        plan_id = input_dto.plan_id
+        plan_id = command.plan_id
         if plan_id is None:
-            free_plan = self._plan_repo.find_by_name("Free")
+            free_plan = self.plan_repo.find_by_name(Plan.DEFAULT_FREE_PLAN_NAME)
             if not free_plan or free_plan.plan_id is None:
                 raise EntityNotFoundError("Default Free plan not found.")
             plan_id = free_plan.plan_id
         else:
-            plan = self._plan_repo.find_by_id(plan_id)
+            plan = self.plan_repo.find_by_id(plan_id)
             if not plan:
                 raise EntityNotFoundError(f"Plan with ID {plan_id} not found.")
 
-        hashed_password = self._password_hasher.hash_password(input_dto.password)
+        hashed_password = self.password_hasher.hash_password(command.password)
         new_user = User(
             user_id=None,
-            email=input_dto.email.strip().lower(),
+            email=command.email.strip().lower(),
             password_hash=hashed_password,
-            display_name=input_dto.display_name.strip(),
-            age=input_dto.age,
+            display_name=command.display_name.strip(),
+            age=command.age,
             plan_id=plan_id,
             is_admin=False,
         )
-        saved = self._user_repo.save(new_user)
-        return UserResponse.from_domain(saved)
+        return self.user_repo.save(new_user)

@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from app.application.dtos.review_dtos import SearchTracksInput
+from app.application.commands import SearchTracksCommand
 from app.application.use_cases.review.search_tracks import SearchTracksUseCase
 from app.domain.models import Track, User
 
@@ -33,14 +33,14 @@ def test_search_tracks_passes_pagination_to_repository(mock_user: User) -> None:
 
     use_case = SearchTracksUseCase(user_repo=user_repo, track_repo=track_repo)
 
-    input_dto = SearchTracksInput(
+    command = SearchTracksCommand(
         user_id=1,
         query="Queen",
         limit=25,
         offset=10,
     )
 
-    result = use_case.execute(input_dto)
+    result = use_case.execute(command)
 
     assert len(result) == 1
     assert result[0].title == "Bohemian Rhapsody"

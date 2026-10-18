@@ -1,11 +1,8 @@
 """Persistence port for Jam sessions and their voting queues."""
 
-from __future__ import annotations
+from typing import Protocol, runtime_checkable
 
-from typing import TYPE_CHECKING, Protocol, runtime_checkable
-
-if TYPE_CHECKING:
-    from app.domain.models import Jam, JamQueueItem
+lazy from app.domain.models import Jam, JamQueueItem
 
 
 @runtime_checkable

@@ -1,14 +1,9 @@
 """Persistence port for tracks."""
 
-from __future__ import annotations
+from typing import Protocol, runtime_checkable
+lazy from collections.abc import Sequence
 
-from typing import TYPE_CHECKING, Protocol, runtime_checkable
-
-if TYPE_CHECKING:
-    from collections.abc import Sequence
-
-    from app.domain.models import Track
-    from app.domain.types import TrackId
+lazy from app.domain.models.track import Track, TrackId
 
 
 @runtime_checkable

@@ -1,10 +1,10 @@
-"""Data transfer objects for authentication."""
+"""Inbound application commands for authentication."""
 
 from dataclasses import dataclass
 
 
 @dataclass(slots=True, frozen=True, kw_only=True)
-class RegisterUserInput:
+class RegisterUserCommand:
     email: str
     password: str
     display_name: str
@@ -13,6 +13,12 @@ class RegisterUserInput:
 
 
 @dataclass(slots=True, frozen=True, kw_only=True)
-class AuthenticateUserInput:
+class AuthenticateUserCommand:
+    email: str
+    password: str
+
+
+@dataclass(slots=True, frozen=True, kw_only=True)
+class AuthenticateAdminCommand:
     email: str
     password: str

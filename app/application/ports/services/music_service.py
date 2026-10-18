@@ -1,14 +1,10 @@
 """Ports and result types for external music catalog and export services."""
 
-from __future__ import annotations
-
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
+lazy from collections.abc import Sequence
 
-if TYPE_CHECKING:
-    from collections.abc import Sequence
-
-    from app.domain.types import ExternalTrackId
+lazy from app.domain.models.track import ExternalTrackId
 
 
 @dataclass(slots=True, frozen=True, kw_only=True)
