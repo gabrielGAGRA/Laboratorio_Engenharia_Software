@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timedelta
 lazy import sqlite3
 
 from app.application.ports.repositories.review_repository import ReviewRepositoryPort
+from app.domain.exceptions import EntityNotFoundError
 from app.domain.models.review import ReviewComment
 
 
@@ -63,6 +64,9 @@ class SQLiteReviewRepository(ReviewRepositoryPort):
                 )
                 self.conn.commit()
                 return self.find_by_id(review.review_id) or review
+            raise EntityNotFoundError(
+                entity_name="ReviewComment", entity_id=review.review_id
+            )
 
         created_at_str = (review.created_at or datetime.now(UTC)).isoformat()
         cursor = self.conn.execute(

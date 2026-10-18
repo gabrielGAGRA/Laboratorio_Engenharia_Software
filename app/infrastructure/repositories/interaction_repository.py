@@ -40,38 +40,12 @@ class SQLiteInteractionRepository(InteractionRepositoryPort):
         return _row_to_interaction(row) if row else None
 
     def save(self, interaction: Interaction) -> Interaction:
-        cursor = self.conn.execute(
-            """
-            SELECT interaction_id FROM interactions
-            WHERE user_id = ? AND track_id = ?
-            """,
-            (interaction.user_id, interaction.track_id),
-        )
-        existing = cursor.fetchone()
-        if existing:
-            self.conn.execute(
-                """
-                UPDATE interactions
-                SET action = ?
-                WHERE user_id = ? AND track_id = ?
-                """,
-                (
-                    interaction.action.value,
-                    interaction.user_id,
-                    interaction.track_id,
-                ),
-            )
-            self.conn.commit()
-            return (
-                self.find_by_user_and_track(interaction.user_id, interaction.track_id)
-                or interaction
-            )
-
         created_at_str = (interaction.created_at or datetime.now(UTC)).isoformat()
         self.conn.execute(
             """
             INSERT INTO interactions (user_id, track_id, action, created_at)
             VALUES (?, ?, ?, ?)
+            ON CONFLICT(user_id, track_id) DO UPDATE SET action = excluded.action
             """,
             (
                 interaction.user_id,

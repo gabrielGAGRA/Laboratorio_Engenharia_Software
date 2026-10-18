@@ -5,7 +5,8 @@ lazy import sqlite3
 lazy from collections.abc import Sequence
 
 from app.application.ports.repositories.track_repository import TrackRepositoryPort
-from app.domain.models.track import Track
+from app.domain.exceptions import EntityNotFoundError
+from app.domain.models.track import Track, TrackId
 
 
 def _row_to_track(row: sqlite3.Row) -> Track:
@@ -43,6 +44,23 @@ class SQLiteTrackRepository(TrackRepositoryPort):
         )
         row = cursor.fetchone()
         return _row_to_track(row) if row else None
+
+    def find_by_ids(self, track_ids: Sequence[TrackId | int]) -> dict[int, Track]:
+        if not track_ids:
+            return {}
+        unique_ids = list(dict.fromkeys(int(t) for t in track_ids))
+        placeholders = ",".join("?" for _ in unique_ids)
+        cursor = self.conn.execute(
+            f"SELECT * FROM tracks WHERE track_id IN ({placeholders})",  # noqa: S608
+            tuple(unique_ids),
+        )
+        rows = cursor.fetchall()
+        result: dict[int, Track] = {}
+        for r in rows:
+            track = _row_to_track(r)
+            if track.track_id is not None:
+                result[track.track_id] = track
+        return result
 
     def save(self, track: Track) -> Track:
         if track.track_id is not None:
@@ -86,6 +104,7 @@ class SQLiteTrackRepository(TrackRepositoryPort):
                 )
                 self.conn.commit()
                 return self.find_by_id(track.track_id) or track
+            raise EntityNotFoundError(entity_name="Track", entity_id=track.track_id)
 
         created_at_str = (track.created_at or datetime.now(UTC)).isoformat()
         cursor = self.conn.execute(
@@ -195,5 +214,10 @@ class SQLiteTrackRepository(TrackRepositoryPort):
 
     def count_all(self) -> int:
         cursor = self.conn.execute("SELECT count(*) FROM tracks")
+        row = cursor.fetchone()
+        return int(row[0]) if row else 0
+
+    def count_active(self) -> int:
+        cursor = self.conn.execute("SELECT COUNT(*) FROM tracks WHERE is_deleted = 0")
         row = cursor.fetchone()
         return int(row[0]) if row else 0

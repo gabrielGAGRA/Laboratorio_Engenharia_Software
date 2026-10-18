@@ -4,6 +4,7 @@ import sqlite3
 
 import pytest
 
+from app.domain.exceptions import EntityNotFoundError
 from app.domain.models import (
     Interaction,
     InteractionAction,
@@ -256,3 +257,238 @@ def test_jam_and_review_repositories(conn: sqlite3.Connection) -> None:
     top_recent = review_repo.list_top_recent(days=7, limit=3)
     assert len(top_recent) == 1
     assert top_recent[0].likes_count == 10
+
+
+def test_interaction_repository_atomic_upsert(conn: sqlite3.Connection) -> None:
+    plan_repo = SQLitePlanRepository(conn)
+    user_repo = SQLiteUserRepository(conn)
+    track_repo = SQLiteTrackRepository(conn)
+    interaction_repo = SQLiteInteractionRepository(conn)
+
+    plan = plan_repo.save(Plan(name="FreePlan", initial_monthly_price=0.0))
+    user = user_repo.save(
+        User(
+            email="upsert@test.com",
+            password_hash="pw",
+            display_name="Upsert",
+            age=20,
+            plan_id=plan.plan_id,
+        )
+    )
+    track = track_repo.save(
+        Track(title="Song", artist="Art", duration_seconds=120, genre="Pop")
+    )
+
+    i1 = interaction_repo.save(
+        Interaction(
+            user_id=user.user_id,
+            track_id=track.track_id,
+            action=InteractionAction.LIKE,
+        )
+    )
+    assert i1.action == InteractionAction.LIKE
+    assert i1.interaction_id is not None
+
+    i2 = interaction_repo.save(
+        Interaction(
+            user_id=user.user_id,
+            track_id=track.track_id,
+            action=InteractionAction.DISLIKE,
+        )
+    )
+    assert i2.interaction_id == i1.interaction_id
+    assert i2.action == InteractionAction.DISLIKE
+
+    cursor = conn.execute(
+        "SELECT * FROM interactions WHERE user_id = ? AND track_id = ?",
+        (user.user_id, track.track_id),
+    )
+    rows = cursor.fetchall()
+    assert len(rows) == 1
+    assert rows[0]["action"] == InteractionAction.DISLIKE.value
+
+
+def test_repositories_raise_entity_not_found_on_missing_id(
+    conn: sqlite3.Connection,
+) -> None:
+    plan_repo = SQLitePlanRepository(conn)
+    user_repo = SQLiteUserRepository(conn)
+    track_repo = SQLiteTrackRepository(conn)
+    jam_repo = SQLiteJamRepository(conn)
+    playlist_repo = SQLitePlaylistRepository(conn)
+    review_repo = SQLiteReviewRepository(conn)
+
+    with pytest.raises(EntityNotFoundError) as exc_info:
+        plan_repo.save(Plan(plan_id=9999, name="Missing", initial_monthly_price=5.0))
+    assert exc_info.value.details.get("entity_name") == "Plan"
+
+    with pytest.raises(EntityNotFoundError) as exc_info:
+        user_repo.save(
+            User(
+                user_id=9999,
+                email="missing@x.com",
+                password_hash="pw",
+                display_name="Miss",
+                age=20,
+                plan_id=1,
+            )
+        )
+    assert exc_info.value.details.get("entity_name") == "User"
+
+    with pytest.raises(EntityNotFoundError) as exc_info:
+        track_repo.save(
+            Track(
+                track_id=9999,
+                title="Missing",
+                artist="Nobody",
+                duration_seconds=100,
+                genre="Pop",
+            )
+        )
+    assert exc_info.value.details.get("entity_name") == "Track"
+
+    with pytest.raises(EntityNotFoundError) as exc_info:
+        jam_repo.save(Jam(jam_id=9999, host_user_id=1, room_name="Missing"))
+    assert exc_info.value.details.get("entity_name") == "Jam"
+
+    with pytest.raises(EntityNotFoundError) as exc_info:
+        playlist_repo.save(Playlist(playlist_id=9999, user_id=1, name="Missing"))
+    assert exc_info.value.details.get("entity_name") == "Playlist"
+
+    with pytest.raises(EntityNotFoundError) as exc_info:
+        review_repo.save(
+            ReviewComment(
+                review_id=9999,
+                user_id=1,
+                track_id=1,
+                initial_rating=3,
+                text="Missing",
+            )
+        )
+    assert exc_info.value.details.get("entity_name") == "ReviewComment"
+
+
+def test_jam_repository_advance_playback_atomic(conn: sqlite3.Connection) -> None:
+    plan_repo = SQLitePlanRepository(conn)
+    user_repo = SQLiteUserRepository(conn)
+    track_repo = SQLiteTrackRepository(conn)
+    jam_repo = SQLiteJamRepository(conn)
+
+    plan = plan_repo.save(Plan(name="PlanJamAdv", initial_monthly_price=0.0))
+    user = user_repo.save(
+        User(
+            email="hostadv@test.com",
+            password_hash="pw",
+            display_name="AdvHost",
+            age=25,
+            plan_id=plan.plan_id,
+        )
+    )
+    track1 = track_repo.save(
+        Track(title="T1", artist="A1", duration_seconds=100, genre="Pop")
+    )
+    track2 = track_repo.save(
+        Track(title="T2", artist="A2", duration_seconds=150, genre="Pop")
+    )
+
+    jam = jam_repo.save(Jam(host_user_id=user.user_id, room_name="JamAdv"))
+    jam_repo.save_queue_item(
+        JamQueueItem(
+            jam_id=jam.jam_id,
+            track_id=track1.track_id,
+            initial_vote_points=5,
+        )
+    )
+    jam_repo.save_queue_item(
+        JamQueueItem(
+            jam_id=jam.jam_id,
+            track_id=track2.track_id,
+            initial_vote_points=2,
+        )
+    )
+
+    updated_jam = jam_repo.advance_playback(
+        jam_id=jam.jam_id,
+        new_track_id=track1.track_id,
+        removed_track_id=track1.track_id,
+    )
+    assert updated_jam.current_track_id == track1.track_id
+
+    queue = jam_repo.list_queue(jam.jam_id)
+    assert len(queue) == 1
+    assert queue[0].track_id == track2.track_id
+
+    with pytest.raises(EntityNotFoundError):
+        jam_repo.advance_playback(
+            jam_id=9999,
+            new_track_id=track2.track_id,
+            removed_track_id=track2.track_id,
+        )
+
+
+def test_track_repository_find_by_ids(conn: sqlite3.Connection) -> None:
+    track_repo = SQLiteTrackRepository(conn)
+
+    assert track_repo.find_by_ids([]) == {}
+
+    t1 = track_repo.save(
+        Track(title="Track 1", artist="Art 1", duration_seconds=100, genre="Rock")
+    )
+    t2 = track_repo.save(
+        Track(title="Track 2", artist="Art 2", duration_seconds=200, genre="Jazz")
+    )
+
+    tracks_map = track_repo.find_by_ids([t1.track_id, t2.track_id, 9999, t1.track_id])
+    assert len(tracks_map) == 2
+    assert t1.track_id in tracks_map
+    assert t2.track_id in tracks_map
+    assert tracks_map[t1.track_id].title == "Track 1"
+    assert tracks_map[t2.track_id].title == "Track 2"
+
+
+def test_counts_in_user_and_track_repositories(conn: sqlite3.Connection) -> None:
+    plan_repo = SQLitePlanRepository(conn)
+    user_repo = SQLiteUserRepository(conn)
+    track_repo = SQLiteTrackRepository(conn)
+
+    assert user_repo.count_all() == 0
+    assert track_repo.count_all() == 0
+    assert track_repo.count_active() == 0
+
+    plan = plan_repo.save(Plan(name="CountPlan", initial_monthly_price=0.0))
+    user_repo.save(
+        User(
+            email="u1@test.com",
+            password_hash="pw",
+            display_name="U1",
+            age=20,
+            plan_id=plan.plan_id,
+        )
+    )
+    user_repo.save(
+        User(
+            email="u2@test.com",
+            password_hash="pw",
+            display_name="U2",
+            age=25,
+            plan_id=plan.plan_id,
+        )
+    )
+
+    assert user_repo.count_all() == 2
+
+    track_repo.save(
+        Track(title="Active Track", artist="Art", duration_seconds=100, genre="Pop")
+    )
+    track_repo.save(
+        Track(
+            title="Deleted Track",
+            artist="Art",
+            duration_seconds=100,
+            genre="Pop",
+            is_deleted=True,
+        )
+    )
+
+    assert track_repo.count_all() == 2
+    assert track_repo.count_active() == 1

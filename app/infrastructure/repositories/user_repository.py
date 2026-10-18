@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 lazy import sqlite3
 
 from app.application.ports.repositories.user_repository import UserRepositoryPort
+from app.domain.exceptions import EntityNotFoundError
 from app.domain.models.user import User
 
 
@@ -93,6 +94,7 @@ class SQLiteUserRepository(UserRepositoryPort):
                 )
                 self.conn.commit()
                 return self.find_by_id(user.user_id) or user
+            raise EntityNotFoundError(entity_name="User", entity_id=user.user_id)
 
         created_at_str = (user.created_at or datetime.now(UTC)).isoformat()
         cursor = self.conn.execute(
@@ -141,3 +143,8 @@ class SQLiteUserRepository(UserRepositoryPort):
         cursor = self.conn.execute("SELECT * FROM users ORDER BY user_id ASC")
         rows = cursor.fetchall()
         return [_row_to_user(r) for r in rows]
+
+    def count_all(self) -> int:
+        cursor = self.conn.execute("SELECT COUNT(*) FROM users")
+        row = cursor.fetchone()
+        return int(row[0]) if row else 0

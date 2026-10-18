@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 lazy import sqlite3
 
 from app.application.ports.repositories.jam_repository import JamRepositoryPort
+from app.domain.exceptions import EntityNotFoundError
 from app.domain.models.jam import Jam, JamQueueItem
 
 
@@ -83,6 +84,7 @@ class SQLiteJamRepository(JamRepositoryPort):
                 )
                 self.conn.commit()
                 return self.find_by_id(jam.jam_id) or jam
+            raise EntityNotFoundError(entity_name="Jam", entity_id=jam.jam_id)
 
         created_at_str = (jam.created_at or datetime.now(UTC)).isoformat()
         cursor = self.conn.execute(
@@ -171,3 +173,34 @@ class SQLiteJamRepository(JamRepositoryPort):
         )
         self.conn.commit()
         return cursor.rowcount > 0
+
+    def advance_playback(
+        self, jam_id: int, new_track_id: int, removed_track_id: int
+    ) -> Jam:
+        cursor = self.conn.execute(
+            "SELECT jam_id FROM jams WHERE jam_id = ?",
+            (jam_id,),
+        )
+        if not cursor.fetchone():
+            raise EntityNotFoundError(entity_name="Jam", entity_id=jam_id)
+
+        self.conn.execute(
+            """
+            UPDATE jams
+            SET current_track_id = ?
+            WHERE jam_id = ?
+            """,
+            (new_track_id, jam_id),
+        )
+        self.conn.execute(
+            """
+            DELETE FROM jam_queue_items
+            WHERE jam_id = ? AND track_id = ?
+            """,
+            (jam_id, removed_track_id),
+        )
+        self.conn.commit()
+        jam = self.find_by_id(jam_id)
+        if jam is None:
+            raise EntityNotFoundError(entity_name="Jam", entity_id=jam_id)
+        return jam

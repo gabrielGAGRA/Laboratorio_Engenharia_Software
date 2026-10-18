@@ -6,6 +6,7 @@ lazy import sqlite3
 from app.application.ports.repositories.playlist_repository import (
     PlaylistRepositoryPort,
 )
+from app.domain.exceptions import EntityNotFoundError
 from app.domain.models.playlist import Playlist
 from app.infrastructure.repositories.track_repository import _row_to_track
 lazy from app.domain.models.track import Track
@@ -109,6 +110,9 @@ class SQLitePlaylistRepository(PlaylistRepositoryPort):
                         )
                 self.conn.commit()
                 return self.find_by_id(playlist.playlist_id) or playlist
+            raise EntityNotFoundError(
+                entity_name="Playlist", entity_id=playlist.playlist_id
+            )
 
         created_at_str = (playlist.created_at or datetime.now(UTC)).isoformat()
         cursor = self.conn.execute(

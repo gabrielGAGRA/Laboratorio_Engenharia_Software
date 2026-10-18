@@ -3,6 +3,7 @@
 lazy import sqlite3
 
 from app.application.ports.repositories.plan_repository import PlanRepositoryPort
+from app.domain.exceptions import EntityNotFoundError
 from app.domain.models.plan import Plan
 
 
@@ -66,6 +67,7 @@ class SQLitePlanRepository(PlanRepositoryPort):
                 )
                 self.conn.commit()
                 return self.find_by_id(plan.plan_id) or plan
+            raise EntityNotFoundError(entity_name="Plan", entity_id=plan.plan_id)
 
         cursor = self.conn.execute(
             """

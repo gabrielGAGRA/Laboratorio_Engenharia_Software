@@ -30,8 +30,8 @@ class AdvanceJamPlaybackUseCase:
             raise BusinessRuleViolationError("No tracks in queue to advance.")
 
         winning_item = queue[0]
-        jam.set_current_track(winning_item.track_id)
-        saved = self.jam_repo.save(jam)
-        self.jam_repo.remove_track_from_queue(jam_id, winning_item.track_id)
-
-        return saved
+        return self.jam_repo.advance_playback(
+            jam_id=jam_id,
+            new_track_id=winning_item.track_id,
+            removed_track_id=winning_item.track_id,
+        )

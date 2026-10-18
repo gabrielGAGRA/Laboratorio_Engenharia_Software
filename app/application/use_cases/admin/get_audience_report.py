@@ -15,9 +15,9 @@ class GetAudienceReportUseCase:
     track_repo: TrackRepositoryPort
 
     def execute(self) -> AudienceReportResult:
-        total_users = len(self.user_repo.list_all())
+        total_users = self.user_repo.count_all()
         total_tracks = self.track_repo.count_all()
-        active_tracks = len(self.track_repo.list_active(limit=1000))
+        active_tracks = self.track_repo.count_active()
 
         return AudienceReportResult(
             total_users=total_users,
