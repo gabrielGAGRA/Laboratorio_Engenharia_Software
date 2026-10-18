@@ -2,10 +2,8 @@
 
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from datetime import datetime
+from typing import Self
+lazy from datetime import datetime
 
 
 class InteractionAction(StrEnum):
@@ -29,3 +27,7 @@ class Interaction:
     @property
     def is_positive(self) -> bool:
         return self.action.is_positive
+
+    def change_action(self, new_action: InteractionAction) -> Self:
+        self.action = new_action
+        return self

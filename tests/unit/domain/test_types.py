@@ -1,6 +1,6 @@
 """Tests for domain type aliases and semantic identifiers."""
 
-from app.domain.types import ExternalTrackId, TrackId
+from app.domain.models.track import ExternalTrackId, TrackId
 
 
 def test_track_id_is_new_type() -> None:

@@ -1,10 +1,11 @@
 """Domain model representing a music track."""
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Self
+from typing import NewType, Self
+lazy from datetime import datetime
 
-if TYPE_CHECKING:
-    from datetime import datetime
+TrackId = NewType("TrackId", int)
+ExternalTrackId = NewType("ExternalTrackId", str)
 
 
 @dataclass(slots=True, kw_only=True, eq=False)
@@ -27,6 +28,10 @@ class Track:
     def __post_init__(self) -> None:
         if self.duration_seconds <= 0:
             raise ValueError("Track duration must be positive.")
+
+    def set_explicit(self, explicit: bool) -> Self:
+        self.explicit = explicit
+        return self
 
     def mark_as_deleted(self) -> Self:
         self.is_deleted = True

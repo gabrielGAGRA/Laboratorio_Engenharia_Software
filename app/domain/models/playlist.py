@@ -1,15 +1,12 @@
 """Domain model representing a playlist entity."""
 
 from dataclasses import InitVar, dataclass, field
-from typing import TYPE_CHECKING, Self
+from typing import Self
+lazy from collections.abc import Sequence
+lazy from datetime import datetime
 
 from app.domain.exceptions import BusinessRuleViolationError
-
-if TYPE_CHECKING:
-    from collections.abc import Sequence
-    from datetime import datetime
-
-    from app.domain.models.track import Track
+lazy from app.domain.models.track import Track
 
 
 @dataclass(slots=True, kw_only=True, eq=False)
@@ -27,6 +24,9 @@ class Playlist:
     def __post_init__(self, initial_tracks: Sequence[Track]) -> None:
         for track in initial_tracks:
             self.add_track(track)
+
+    def is_owned_by(self, user_id: int) -> bool:
+        return self.user_id == user_id
 
     @property
     def tracks(self) -> tuple[Track, ...]:

@@ -3,12 +3,10 @@
 import secrets
 import string
 from dataclasses import InitVar, dataclass, field
-from typing import TYPE_CHECKING, ClassVar, Self
+from typing import ClassVar, Self
+lazy from datetime import datetime
 
 from app.domain.exceptions import BusinessRuleViolationError
-
-if TYPE_CHECKING:
-    from datetime import datetime
 
 
 @dataclass(slots=True, kw_only=True, eq=False)

@@ -1,9 +1,7 @@
 """Domain exception hierarchy."""
 
-from typing import TYPE_CHECKING, Any
-
-if TYPE_CHECKING:
-    from collections.abc import Mapping
+from typing import Any
+lazy from collections.abc import Mapping
 
 
 class CustomError(Exception):
@@ -122,6 +120,4 @@ __all__ = [
     "EntityNotFoundError",
     "ExternalServiceError",
     "PermissionDeniedError",
-    "PermissionDeniedError",
-    "AuthenticationRequiredError",
 ]

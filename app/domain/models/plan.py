@@ -1,11 +1,13 @@
 """Domain model representing a subscription plan."""
 
 from dataclasses import InitVar, dataclass, field
-from typing import Self
+from typing import ClassVar, Self
 
 
 @dataclass(slots=True, kw_only=True, eq=False)
 class Plan:
+    DEFAULT_FREE_PLAN_NAME: ClassVar[str] = "Free"
+
     plan_id: int | None = None
     name: str
     initial_monthly_price: InitVar[float]
@@ -43,6 +45,13 @@ class Plan:
         if not self.allows_dependents:
             return False
         return self.can_accommodate(1 + current_dependents + 1)
+
+    def update_name(self, new_name: str) -> Self:
+        cleaned = new_name.strip()
+        if not cleaned:
+            raise ValueError("Plan name cannot be blank.")
+        self.name = cleaned
+        return self
 
     def update_price(self, new_price: float) -> Self:
         if new_price < 0.0:
