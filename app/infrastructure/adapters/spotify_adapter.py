@@ -1,5 +1,6 @@
 """Spotify API adapter implementing TrackCatalogPort and PlaylistExportPort."""
 
+import uuid
 from http import HTTPStatus
 lazy from collections.abc import Sequence
 
@@ -78,4 +79,5 @@ class SpotifyAdapter(TrackCatalogPort, PlaylistExportPort):
         Raises:
             ExternalServiceError: If Spotify API communication fails.
         """
-        return f"spotify:playlist:{hash(name + account_id) & 0xFFFFFFF}"
+        playlist_id = uuid.uuid5(uuid.NAMESPACE_DNS, f"{account_id}:{name}").hex[:22]
+        return f"spotify:playlist:{playlist_id}"

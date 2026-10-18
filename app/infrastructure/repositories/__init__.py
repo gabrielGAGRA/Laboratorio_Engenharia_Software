@@ -1,5 +1,8 @@
 """Concrete repository implementations conforming to application repository ports."""
 
+from app.infrastructure.repositories.audit_log_repository import (
+    SQLiteAuditLogRepository,
+)
 from app.infrastructure.repositories.interaction_repository import (
     SQLiteInteractionRepository,
 )
@@ -22,6 +25,7 @@ from app.infrastructure.repositories.user_repository import (
     SQLiteUserRepository,
 )
 
+AuditLogRepository = SQLiteAuditLogRepository
 InteractionRepository = SQLiteInteractionRepository
 JamRepository = SQLiteJamRepository
 PlanRepository = SQLitePlanRepository
@@ -31,11 +35,13 @@ TrackRepository = SQLiteTrackRepository
 UserRepository = SQLiteUserRepository
 
 __all__ = [
+    "AuditLogRepository",
     "InteractionRepository",
     "JamRepository",
     "PlanRepository",
     "PlaylistRepository",
     "ReviewRepository",
+    "SQLiteAuditLogRepository",
     "SQLiteInteractionRepository",
     "SQLiteJamRepository",
     "SQLitePlanRepository",

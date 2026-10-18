@@ -1,5 +1,8 @@
 """Persistence ports for domain aggregates and entities."""
 
+from app.application.ports.repositories.audit_log_repository import (
+    AuditLogRepositoryPort,
+)
 from app.application.ports.repositories.interaction_repository import (
     InteractionRepositoryPort,
 )
@@ -17,6 +20,7 @@ from app.application.ports.repositories.track_repository import (
 from app.application.ports.repositories.user_repository import UserRepositoryPort
 
 __all__ = [
+    "AuditLogRepositoryPort",
     "InteractionRepositoryPort",
     "JamRepositoryPort",
     "PlanRepositoryPort",

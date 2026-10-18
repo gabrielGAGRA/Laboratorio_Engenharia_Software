@@ -117,3 +117,21 @@ class SQLiteReviewRepository(ReviewRepositoryPort):
         )
         rows = cursor.fetchall()
         return [_row_to_review(r) for r in rows]
+
+    def has_user_liked(self, review_id: int, user_id: int) -> bool:
+        cursor = self.conn.execute(
+            "SELECT 1 FROM review_likes WHERE review_id = ? AND user_id = ?",
+            (review_id, user_id),
+        )
+        return cursor.fetchone() is not None
+
+    def record_like(self, review_id: int, user_id: int) -> None:
+        created_at_str = datetime.now(UTC).isoformat()
+        self.conn.execute(
+            """
+            INSERT OR IGNORE INTO review_likes (review_id, user_id, created_at)
+            VALUES (?, ?, ?)
+            """,
+            (review_id, user_id, created_at_str),
+        )
+        self.conn.commit()

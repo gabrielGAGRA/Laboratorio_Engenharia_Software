@@ -3,6 +3,7 @@
 import sqlite3
 
 from app.application.ports.repositories import (
+    AuditLogRepositoryPort,
     InteractionRepositoryPort,
     JamRepositoryPort,
     PlanRepositoryPort,
@@ -19,11 +20,13 @@ from app.application.ports.services import (
 )
 from app.infrastructure.adapters import ITunesAdapter, SpotifyAdapter
 from app.infrastructure.repositories import (
+    AuditLogRepository,
     InteractionRepository,
     JamRepository,
     PlanRepository,
     PlaylistRepository,
     ReviewRepository,
+    SQLiteAuditLogRepository,
     SQLiteInteractionRepository,
     SQLiteJamRepository,
     SQLitePlanRepository,
@@ -67,6 +70,10 @@ def test_repository_contract_compliance() -> None:
         review_repo = ReviewRepository(conn)
         assert isinstance(review_repo, ReviewRepositoryPort)
         assert isinstance(SQLiteReviewRepository(conn), ReviewRepositoryPort)
+
+        audit_repo = AuditLogRepository(conn)
+        assert isinstance(audit_repo, AuditLogRepositoryPort)
+        assert isinstance(SQLiteAuditLogRepository(conn), AuditLogRepositoryPort)
     finally:
         conn.close()
 

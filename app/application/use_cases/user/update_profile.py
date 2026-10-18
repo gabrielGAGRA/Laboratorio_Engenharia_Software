@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 
-from app.domain.exceptions import EntityNotFoundError
+from app.domain.exceptions import AuthenticationRequiredError, EntityNotFoundError
 lazy from app.application.commands.user_commands import UpdateProfileCommand
 lazy from app.application.ports.repositories.user_repository import UserRepositoryPort
 lazy from app.application.ports.services.password_hasher import PasswordHasherPort
@@ -21,11 +21,16 @@ class UpdateProfileUseCase:
         if not user:
             raise EntityNotFoundError(f"User with ID {command.user_id} not found.")
 
-        password_hash = (
-            self.password_hasher.hash_password(command.new_password)
-            if command.new_password
-            else None
-        )
+        password_hash: str | None = None
+        if command.new_password:
+            if not command.current_password or not self.password_hasher.verify_password(
+                command.current_password, user.password_hash
+            ):
+                raise AuthenticationRequiredError(
+                    "Current password is required and must match."
+                )
+            password_hash = self.password_hasher.hash_password(command.new_password)
+
         user.update_profile(
             display_name=command.display_name,
             password_hash=password_hash,

@@ -69,6 +69,7 @@ from app.application.use_cases.user import (
 from app.config import Settings, load_settings
 from app.infrastructure.adapters import SpotifyAdapter
 from app.infrastructure.repositories import (
+    SQLiteAuditLogRepository,
     SQLiteInteractionRepository,
     SQLiteJamRepository,
     SQLitePlanRepository,
@@ -105,6 +106,7 @@ class Container:
     interaction_repo: SQLiteInteractionRepository
     jam_repo: SQLiteJamRepository
     review_repo: SQLiteReviewRepository
+    audit_log_repo: SQLiteAuditLogRepository
     # Auth
     register_user_use_case: RegisterUserUseCase
     authenticate_user_use_case: AuthenticateUserUseCase
@@ -188,6 +190,7 @@ def build_container(
     interaction_repo = SQLiteInteractionRepository(conn)
     jam_repo = SQLiteJamRepository(conn)
     review_repo = SQLiteReviewRepository(conn)
+    audit_log_repo = SQLiteAuditLogRepository(conn)
 
     return Container(
         settings=settings,
@@ -201,6 +204,7 @@ def build_container(
         interaction_repo=interaction_repo,
         jam_repo=jam_repo,
         review_repo=review_repo,
+        audit_log_repo=audit_log_repo,
         # Auth
         register_user_use_case=RegisterUserUseCase(
             user_repo, plan_repo, password_hasher
@@ -267,7 +271,7 @@ def build_container(
             user_repo, plan_repo, interaction_repo
         ),
         get_annual_listening_stats_use_case=GetAnnualListeningStatsUseCase(
-            user_repo, plan_repo, interaction_repo
+            user_repo, plan_repo, interaction_repo, track_repo
         ),
         link_spotify_account_use_case=LinkSpotifyAccountUseCase(user_repo),
         # Admin
@@ -280,7 +284,7 @@ def build_container(
         block_track_use_case=BlockTrackUseCase(track_repo),
         get_top_moderation_reviews_use_case=GetTopModerationReviewsUseCase(review_repo),
         get_audience_report_use_case=GetAudienceReportUseCase(user_repo, track_repo),
-        get_audit_logs_use_case=GetAuditLogsUseCase(),
+        get_audit_logs_use_case=GetAuditLogsUseCase(audit_log_repo),
         promote_user_to_admin_use_case=PromoteUserToAdminUseCase(user_repo),
     )
 

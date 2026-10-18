@@ -18,6 +18,7 @@ from app.domain.models import (
 )
 from app.infrastructure.persistence.connection import SCHEMA_PATH
 from app.infrastructure.repositories import (
+    SQLiteAuditLogRepository,
     SQLiteInteractionRepository,
     SQLiteJamRepository,
     SQLitePlanRepository,
@@ -258,6 +259,13 @@ def test_jam_and_review_repositories(conn: sqlite3.Connection) -> None:
     assert len(top_recent) == 1
     assert top_recent[0].likes_count == 10
 
+    assert review_repo.has_user_liked(saved_review.review_id, user.user_id) is False
+    review_repo.record_like(saved_review.review_id, user.user_id)
+    assert review_repo.has_user_liked(saved_review.review_id, user.user_id) is True
+    # Idempotency of record_like
+    review_repo.record_like(saved_review.review_id, user.user_id)
+    assert review_repo.has_user_liked(saved_review.review_id, user.user_id) is True
+
 
 def test_interaction_repository_atomic_upsert(conn: sqlite3.Connection) -> None:
     plan_repo = SQLitePlanRepository(conn)
@@ -492,3 +500,18 @@ def test_counts_in_user_and_track_repositories(conn: sqlite3.Connection) -> None
 
     assert track_repo.count_all() == 2
     assert track_repo.count_active() == 1
+
+
+def test_audit_log_repository(conn: sqlite3.Connection) -> None:
+    audit_repo = SQLiteAuditLogRepository(conn)
+    assert audit_repo.list_all() == []
+
+    audit_repo.log_event("EVENT_A", "SUCCESS")
+    audit_repo.log_event("EVENT_B", "FAILED")
+
+    logs = audit_repo.list_all()
+    assert len(logs) == 2
+    assert logs[0].event == "EVENT_A"
+    assert logs[0].status == "SUCCESS"
+    assert logs[1].event == "EVENT_B"
+    assert logs[1].status == "FAILED"

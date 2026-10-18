@@ -102,3 +102,17 @@ CREATE TABLE IF NOT EXISTS reviews (
 );
 
 CREATE INDEX IF NOT EXISTS idx_reviews_track_id ON reviews(track_id);
+
+CREATE TABLE IF NOT EXISTS review_likes (
+    review_id INTEGER NOT NULL REFERENCES reviews(review_id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (review_id, user_id)
+);
+
+CREATE TABLE IF NOT EXISTS audit_logs (
+    log_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event TEXT NOT NULL,
+    status TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);

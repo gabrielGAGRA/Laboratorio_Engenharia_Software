@@ -39,6 +39,7 @@ from app.presentation.dependencies import (
     get_update_blocked_genres_use_case,
     get_update_profile_use_case,
     get_user_profile_use_case,
+    require_user,
 )
 from app.presentation.schemas import (
     ActionSuccessResponse,
@@ -60,7 +61,7 @@ router = APIRouter(tags=["Profile & Plans"])
 
 @router.get("/api/profile/me", response_model=UserProfileResponse)
 def get_profile(
-    user_id: Annotated[int, Query()],
+    user_id: Annotated[int, Depends(require_user)],
     use_case: Annotated[GetUserProfileUseCase, Depends(get_user_profile_use_case)],
 ) -> UserProfileResponse:
     data = use_case.execute(user_id=user_id)
@@ -70,7 +71,7 @@ def get_profile(
 @router.put("/api/profile/me", response_model=UserResponse)
 def update_profile(
     req: UpdateProfileRequest,
-    user_id: Annotated[int, Query()],
+    user_id: Annotated[int, Depends(require_user)],
     use_case: Annotated[UpdateProfileUseCase, Depends(get_update_profile_use_case)],
 ) -> UserResponse:
     user = use_case.execute(
@@ -78,6 +79,7 @@ def update_profile(
             user_id=user_id,
             display_name=req.display_name,
             new_password=req.new_password,
+            current_password=req.current_password,
         )
     )
     return UserResponse.model_validate(user)
@@ -122,7 +124,7 @@ def change_plan(
 
 @router.delete("/api/profile/plan", response_model=UserResponse)
 def cancel_plan(
-    user_id: Annotated[int, Query()],
+    user_id: Annotated[int, Depends(require_user)],
     use_case: Annotated[
         CancelSubscriptionPlanUseCase,
         Depends(get_cancel_subscription_plan_use_case),
@@ -134,7 +136,7 @@ def cancel_plan(
 
 @router.delete("/api/profile/account", response_model=ActionSuccessResponse)
 def delete_account(
-    user_id: Annotated[int, Query()],
+    user_id: Annotated[int, Depends(require_user)],
     use_case: Annotated[
         DeleteUserAccountUseCase, Depends(get_delete_user_account_use_case)
     ],
@@ -148,7 +150,7 @@ def delete_account(
 
 @router.get("/api/profile/stats", response_model=AnnualStatsResponse)
 def get_annual_stats(
-    user_id: Annotated[int, Query()],
+    user_id: Annotated[int, Depends(require_user)],
     use_case: Annotated[
         GetAnnualListeningStatsUseCase, Depends(get_annual_stats_use_case)
     ],
@@ -176,7 +178,7 @@ def change_interaction(
 
 @router.get("/api/profile/history", response_model=list[InteractionResponse])
 def list_history(
-    user_id: Annotated[int, Query()],
+    user_id: Annotated[int, Depends(require_user)],
     use_case: Annotated[
         ListUserInteractionsUseCase, Depends(get_list_user_interactions_use_case)
     ],
@@ -189,7 +191,7 @@ def list_history(
 
 @router.get("/api/profile/blocked-genres", response_model=list[str])
 def list_blocked_genres(
-    user_id: Annotated[int, Query()],
+    user_id: Annotated[int, Depends(require_user)],
     use_case: Annotated[
         ListBlockedGenresUseCase, Depends(get_list_blocked_genres_use_case)
     ],

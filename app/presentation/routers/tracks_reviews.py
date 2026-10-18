@@ -17,6 +17,7 @@ from app.application.use_cases.review import (
 )
 from app.presentation.dependencies import (
     get_community_feed_use_case,
+    get_current_user_id,
     get_like_review_comment_use_case,
     get_publish_review_use_case,
     get_search_tracks_use_case,
@@ -76,19 +77,22 @@ def publish_review(
 @router.get("/api/reviews/feed", response_model=list[ReviewResponse])
 def get_community_feed(
     use_case: Annotated[GetCommunityFeedUseCase, Depends(get_community_feed_use_case)],
+    days: Annotated[int, Query(ge=1)] = 5,
+    limit: Annotated[int, Query(ge=1, le=100)] = 10,
 ) -> list[ReviewResponse]:
-    reviews = use_case.execute(days=5, limit=3)
+    reviews = use_case.execute(days=days, limit=limit)
     return [ReviewResponse.model_validate(r) for r in reviews]
 
 
 @router.post("/api/reviews/{review_id}/like", response_model=ReviewResponse)
 def like_review(
     review_id: int,
+    user_id: Annotated[int, Depends(get_current_user_id)],
     use_case: Annotated[
         LikeReviewCommentUseCase, Depends(get_like_review_comment_use_case)
     ],
 ) -> ReviewResponse:
-    review = use_case.execute(review_id=review_id)
+    review = use_case.execute(review_id=review_id, user_id=user_id)
     return ReviewResponse.model_validate(review)
 
 

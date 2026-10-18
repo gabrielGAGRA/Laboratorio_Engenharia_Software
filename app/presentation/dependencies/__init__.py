@@ -2,8 +2,11 @@
 
 from app.presentation.dependencies.auth import (
     ADMIN_ID_HEADER,
+    USER_ID_HEADER,
     get_admin_id,
+    get_current_user_id,
     require_admin,
+    require_user,
 )
 from app.presentation.dependencies.use_cases import (
     get_add_family_member_use_case,
@@ -55,6 +58,7 @@ from app.presentation.dependencies.use_cases import (
 
 __all__ = [
     "ADMIN_ID_HEADER",
+    "USER_ID_HEADER",
     "get_add_family_member_use_case",
     "get_add_track_to_playlist_use_case",
     "get_admin_id",
@@ -72,6 +76,7 @@ __all__ = [
     "get_community_feed_use_case",
     "get_create_deck_playlist_use_case",
     "get_create_jam_use_case",
+    "get_current_user_id",
     "get_delete_user_account_use_case",
     "get_executive_dashboard_use_case",
     "get_export_playlist_to_spotify_use_case",
@@ -102,4 +107,5 @@ __all__ = [
     "get_vote_jam_track_use_case",
     "get_vote_skip_jam_track_use_case",
     "require_admin",
+    "require_user",
 ]

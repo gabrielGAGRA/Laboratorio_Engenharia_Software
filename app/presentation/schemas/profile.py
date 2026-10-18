@@ -11,6 +11,7 @@ class UpdateProfileRequest(BaseModel):
 
     display_name: str | None = Field(default=None, min_length=2, max_length=50)
     new_password: str | None = Field(default=None, min_length=6)
+    current_password: str | None = Field(default=None)
 
 
 class LinkSpotifyRequest(BaseModel):
