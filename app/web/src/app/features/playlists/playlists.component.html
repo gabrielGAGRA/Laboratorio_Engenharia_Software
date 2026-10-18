@@ -1,0 +1,172 @@
+<div class="secondary-page playlist-hub">
+  <div class="segmented playlist-hub-tabs">
+    <button
+      [class.selected]="currentTab() === 'playlists'"
+      (click)="selectTab('playlists')"
+    >
+      <app-icon name="music" [size]="15" /> Minhas Playlists
+    </button>
+    <button
+      [class.selected]="currentTab() === 'queue'"
+      (click)="selectTab('queue')"
+    >
+      <app-icon name="play" [size]="15" /> Fila de Reprodução
+      @if (state.queue().length > 0) {
+        <span class="queue-count">{{ state.queue().length }}</span>
+      }
+    </button>
+  </div>
+
+  @if (currentTab() === 'playlists') {
+    <div class="tab-enter">
+      <div class="feature-banner">
+        <span class="feature-icon">
+          <app-icon name="sparkles" [size]="32" />
+        </span>
+        <div>
+          <span class="eyebrow blue">FEITA PARA O SEU MOMENTO</span>
+          <h2>
+            Você escolhe a vibe.<br />
+            A gente encontra o som.
+          </h2>
+          <p>Por duração, destino, festival ou sentimento.</p>
+        </div>
+        <button class="primary-button" (click)="openCreateModal()">
+          <app-icon name="plus" [size]="17" /> Criar playlist
+        </button>
+      </div>
+
+      <div class="section-title">
+        <h2>Sua biblioteca</h2>
+        <span>{{ state.playlists().length }} playlists</span>
+      </div>
+
+      <div class="playlist-grid">
+        @for (p of state.playlists(); track p.name; let i = $index) {
+          <button
+            class="playlist-card"
+            (click)="openPlaylistView(p.name)"
+          >
+            <img
+              [src]="i % 2 === 0 ? oceanImg : palmImg"
+              alt="Paisagem da playlist"
+            />
+            <span class="playlist-card-play">
+              <app-icon name="play" />
+            </span>
+            <strong>{{ p.name }}</strong>
+            <span>{{ p.count }} faixas · {{ p.duration }}</span>
+          </button>
+        }
+      </div>
+    </div>
+  } @else {
+    <div class="queue-workspace tab-enter">
+      <div class="queue-builder">
+        <div class="queue-builder-copy">
+          <span class="eyebrow blue">FILA TEMPORÁRIA</span>
+          <h2>Deslize. Aprove. Dê play.</h2>
+          <p>
+            A fila segue a ordem dos seus likes e desaparece ao encerrar a
+            sessão.
+          </p>
+          <div class="queue-live-status">
+            <i></i>
+            {{ state.queue().length }}
+            {{ state.queue().length === 1 ? 'música pronta' : 'músicas prontas' }}
+          </div>
+        </div>
+
+        <div
+          class="queue-swipe-card"
+          [style.transform]="queueCardTransform()"
+          (pointerdown)="onQueuePointerDown($event)"
+          (pointermove)="onQueuePointerMove($event)"
+          (pointerup)="onQueuePointerUp()"
+          (pointercancel)="onQueuePointerCancel()"
+        >
+          <img
+            [src]="currentQueueSong().image"
+            [alt]="'Capa de ' + currentQueueSong().title"
+          />
+          <div class="queue-card-shade"></div>
+          <span class="match-pill">
+            <app-icon name="sparkles" [size]="12" />
+            {{ currentQueueSong().match }}% sua vibe
+          </span>
+          <div>
+            <strong>{{ currentQueueSong().title }}</strong>
+            <span>{{ currentQueueSong().artist }}</span>
+          </div>
+        </div>
+
+        <div class="queue-swipe-actions">
+          <button
+            class="swipe-button reject"
+            (click)="decideQueue(false)"
+            aria-label="Passar música"
+          >
+            <app-icon name="close" [size]="24" />
+          </button>
+          <button
+            class="swipe-button like"
+            (click)="decideQueue(true)"
+            aria-label="Adicionar música à fila"
+          >
+            <app-icon name="heart" [size]="24" />
+          </button>
+        </div>
+      </div>
+
+      @if (state.queue().length > 0) {
+        <div class="panel current-queue">
+          <div class="section-title">
+            <h2>Próximas na fila</h2>
+            <span>Ordem de aprovação</span>
+          </div>
+          @for (songIndex of state.queue(); track songIndex; let i = $index) {
+            <div class="song-row">
+              <div class="song-cover">
+                <img [src]="getSong(songIndex).image" alt="" />
+              </div>
+              <div class="song-description">
+                <strong>{{ getSong(songIndex).title }}</strong>
+                <span>{{ getSong(songIndex).artist }}</span>
+              </div>
+              <span class="queue-position">0{{ i + 1 }}</span>
+            </div>
+          }
+          <button
+            class="primary-button full-width"
+            (click)="playQueue()"
+          >
+            <app-icon name="play" [size]="16" /> Reproduzir fila
+          </button>
+        </div>
+      }
+
+      <div class="last-queue-card">
+        <div>
+          <span class="eyebrow blue">ÚLTIMA FILA TOCADA</span>
+          <h2>Fim de tarde sem pressa</h2>
+          <p>{{ state.lastQueue().length }} faixas · 18 minutos</p>
+        </div>
+        <div class="last-queue-preview">
+          <div class="last-queue-covers">
+            @for (songIndex of lastQueuePreview(); track songIndex) {
+              <img [src]="getSong(songIndex).image" alt="" />
+            }
+          </div>
+          <ol>
+            @for (songIndex of lastQueuePreview(); track songIndex) {
+              <li>{{ getSong(songIndex).title }}</li>
+            }
+          </ol>
+        </div>
+        <button class="primary-button" (click)="openSaveQueueModal()">
+          <app-icon name="plus" [size]="16" /> Salvar Fila como Playlist
+        </button>
+      </div>
+    </div>
+  }
+</div>

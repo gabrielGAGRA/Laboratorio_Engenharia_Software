@@ -4,6 +4,12 @@
   "type": "module",
   "scripts": {
     "typecheck": "node ./node_modules/typescript-7/bin/tsc --noEmit",
+    "typecheck:web": "npm --prefix app/web run typecheck",
+    "test:web": "npm --prefix app/web test",
+    "build:web": "npm --prefix app/web run build",
+    "dev:web": "npm --prefix app/web start",
+    "start:web": "npm --prefix app/web start",
+    "tunnel:web": "npx localtunnel --port 4200",
     "lint": "oxlint --type-aware src/ && eslint .",
     "lint:fix": "oxlint --type-aware --fix src/ && eslint . --fix",
     "format": "oxfmt --write \"src/**/*.{ts,html,css,scss,json}\" *.mjs",

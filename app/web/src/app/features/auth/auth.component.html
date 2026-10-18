@@ -1,0 +1,111 @@
+<div class="auth-shell">
+  <section class="auth-story">
+    <button class="brand auth-brand" (click)="returnToApp()">
+      <app-frog />
+      <span>ribbit<span class="brand-dot">.</span></span>
+    </button>
+    <div class="auth-message">
+      <span class="eyebrow blue">SEU PRÓXIMO PLAY COMEÇA AQUI</span>
+      <h1>Descubra o som que <span>ainda não sabe que ama.</span></h1>
+      <p>Uma frequência só sua, construída a cada swipe.</p>
+    </div>
+    <div class="auth-art">
+      <div class="auth-ripple ripple-one"></div>
+      <div class="auth-ripple ripple-two"></div>
+      <app-frog />
+    </div>
+  </section>
+
+  <section class="auth-panel">
+    <div class="auth-card">
+      <span class="auth-mobile-logo">
+        <app-frog [small]="true" /> ribbit.
+      </span>
+      <div class="eyebrow blue">
+        {{ isRegister() ? 'BEM-VINDO AO LAGO' : 'QUE BOM TER VOCÊ DE VOLTA' }}
+      </div>
+      <h2>
+        {{ isRegister() ? 'Crie sua frequência.' : 'Entre no seu universo.' }}
+      </h2>
+      <p>
+        {{
+          isRegister()
+            ? 'Comece a descobrir músicas que combinam com você.'
+            : 'Suas descobertas estão esperando por você.'
+        }}
+      </p>
+
+      <form (submit)="onSubmit($event)">
+        @if (isRegister()) {
+          <label>
+            Como podemos chamar você?
+            <input
+              name="name"
+              required
+              placeholder="Seu nome"
+              autocomplete="name"
+            />
+          </label>
+        }
+
+        <label>
+          E-mail
+          <input
+            name="email"
+            type="email"
+            required
+            placeholder="voce@email.com"
+            autocomplete="email"
+          />
+        </label>
+
+        <label>
+          Senha
+          <input
+            name="password"
+            type="password"
+            required
+            minlength="6"
+            placeholder="Mínimo de 6 caracteres"
+            [attr.autocomplete]="
+              isRegister() ? 'new-password' : 'current-password'
+            "
+          />
+        </label>
+
+        @if (isRegister()) {
+          <label class="checkbox-label auth-check">
+            <input type="checkbox" required /> Concordo com os Termos de uso
+            e a Política de privacidade.
+          </label>
+        } @else {
+          <button type="button" class="forgot-button" (click)="onForgot()">
+            Esqueci minha senha
+          </button>
+        }
+
+        <button class="primary-button full-width" type="submit">
+          {{ isRegister() ? 'Criar minha conta' : 'Entrar no Ribbit' }}
+          <app-icon name="arrow" [size]="17" />
+        </button>
+      </form>
+
+      <div class="auth-divider"><span>ou</span></div>
+
+      <button class="outline-button full-width" (click)="onGoogleLogin()">
+        Continuar com Google
+      </button>
+
+      <p class="auth-switch">
+        {{ isRegister() ? 'Já faz parte do lago?' : 'Novo por aqui?' }}
+        <button (click)="toggleView()">
+          {{ isRegister() ? 'Fazer login' : 'Criar conta' }}
+        </button>
+      </p>
+
+      <button class="auth-demo" (click)="returnToApp()">
+        Continuar na demonstração
+      </button>
+    </div>
+  </section>
+</div>
