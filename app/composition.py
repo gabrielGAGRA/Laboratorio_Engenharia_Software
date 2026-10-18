@@ -1,5 +1,6 @@
 """Composition root: inlines infrastructure, use case construction, and router mounting."""
 
+import logging
 import sqlite3
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -79,6 +80,11 @@ from app.infrastructure.repositories import (
     SQLiteUserRepository,
 )
 from app.infrastructure.security import PBKDF2PasswordHasher
+from app.infrastructure.telemetry import (
+    CorrelationIdMiddleware,
+    configure_logging,
+    log_operational_event,
+)
 from app.presentation.exception_handlers import register_exception_handlers
 from app.presentation.routers.admin import router as admin_router
 from app.presentation.routers.auth import router as auth_router
@@ -309,14 +315,36 @@ def create_app(
 ) -> FastAPI:
     """Application factory building FastAPI app with Hexagonal composition root."""
     resolved_settings = settings or load_settings()
+    configure_logging(level=resolved_settings.log_level)
     owns_connection = connection is None
     container = build_container(resolved_settings, connection=connection)
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
-        yield
-        if owns_connection:
-            container.connection.close()
+        logger = logging.getLogger("app")
+        log_operational_event(
+            logger,
+            event="service.startup",
+            status="success",
+            message=(
+                f"Starting service: {resolved_settings.app_title} "
+                f"v{resolved_settings.app_version}"
+            ),
+            app_title=resolved_settings.app_title,
+            app_version=resolved_settings.app_version,
+            environment=resolved_settings.environment,
+        )
+        try:
+            yield
+        finally:
+            log_operational_event(
+                logger,
+                event="service.shutdown",
+                status="success",
+                message=f"Shutting down service: {resolved_settings.app_title}",
+            )
+            if owns_connection:
+                container.connection.close()
 
     app = FastAPI(
         title=resolved_settings.app_title,
@@ -324,6 +352,8 @@ def create_app(
         version=resolved_settings.app_version,
         lifespan=lifespan,
     )
+
+    app.add_middleware(CorrelationIdMiddleware)
 
     app.state.settings = resolved_settings
     app.state.container = container

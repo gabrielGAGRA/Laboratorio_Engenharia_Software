@@ -19,10 +19,18 @@ from app.infrastructure.repositories import (
     SQLiteUserRepository,
 )
 from app.infrastructure.security import PBKDF2PasswordHasher
+from app.infrastructure.telemetry import (
+    CorrelationIdMiddleware,
+    JSONLogFormatter,
+    configure_logging,
+    log_operational_event,
+)
 
 __all__ = [
+    "CorrelationIdMiddleware",
     "DEFAULT_DATABASE_PATH",
     "ITunesAdapter",
+    "JSONLogFormatter",
     "PBKDF2PasswordHasher",
     "SQLiteInteractionRepository",
     "SQLiteJamRepository",
@@ -32,6 +40,8 @@ __all__ = [
     "SQLiteTrackRepository",
     "SQLiteUserRepository",
     "SpotifyAdapter",
+    "configure_logging",
     "create_connection",
+    "log_operational_event",
     "transaction",
 ]
