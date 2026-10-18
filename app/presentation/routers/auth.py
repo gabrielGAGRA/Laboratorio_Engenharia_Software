@@ -1,41 +1,58 @@
 """Authentication and registration router."""
 
+from typing import TYPE_CHECKING, Annotated
+
 from fastapi import APIRouter, Depends, status
 
-from app.application.auth_use_cases import AuthUseCases
-from app.presentation.dependencies import get_auth_use_cases
+from app.application.dtos.auth_dtos import AuthenticateUserInput, RegisterUserInput
+from app.presentation.dependencies import (
+    get_authenticate_user_use_case,
+    get_register_user_use_case,
+)
 from app.presentation.schemas import (
-    CadastroUsuarioRequest,
     LoginRequest,
-    UsuarioResponse,
+    RegisterUserRequest,
+    UserResponse,
 )
 
-router = APIRouter(prefix="/api/auth", tags=["Autenticação"])
+if TYPE_CHECKING:
+    from app.application.use_cases.auth import (
+        AuthenticateUserUseCase,
+        RegisterUserUseCase,
+    )
+
+router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
 
 @router.post(
-    "/cadastrar",
-    response_model=UsuarioResponse,
+    "/register",
+    response_model=UserResponse,
     status_code=status.HTTP_201_CREATED,
 )
-def cadastrar(
-    req: CadastroUsuarioRequest,
-    use_cases: AuthUseCases = Depends(get_auth_use_cases),
-) -> UsuarioResponse:
-    usuario = use_cases.cadastrar_usuario(
-        email=req.email,
-        senha=req.senha,
-        nome_exibicao=req.nome_exibicao,
-        idade=req.idade,
-        plano_id=req.plano_id,
+def register(
+    req: RegisterUserRequest,
+    use_case: Annotated[RegisterUserUseCase, Depends(get_register_user_use_case)],
+) -> UserResponse:
+    user = use_case.execute(
+        RegisterUserInput(
+            email=req.email,
+            password=req.password,
+            display_name=req.display_name,
+            age=req.age,
+            plan_id=req.plan_id,
+        )
     )
-    return UsuarioResponse.model_validate(usuario)
+    return UserResponse.model_validate(user)
 
 
-@router.post("/login", response_model=UsuarioResponse)
+@router.post("/login", response_model=UserResponse)
 def login(
     req: LoginRequest,
-    use_cases: AuthUseCases = Depends(get_auth_use_cases),
-) -> UsuarioResponse:
-    usuario = use_cases.autenticar_usuario(email=req.email, senha=req.senha)
-    return UsuarioResponse.model_validate(usuario)
+    use_case: Annotated[
+        AuthenticateUserUseCase, Depends(get_authenticate_user_use_case)
+    ],
+) -> UserResponse:
+    user = use_case.execute(
+        AuthenticateUserInput(email=req.email, password=req.password)
+    )
+    return UserResponse.model_validate(user)

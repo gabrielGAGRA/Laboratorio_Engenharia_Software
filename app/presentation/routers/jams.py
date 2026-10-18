@@ -1,102 +1,124 @@
 """Collaborative Jam session and queue voting router."""
 
-from typing import Any
+from typing import TYPE_CHECKING, Annotated
 
 from fastapi import APIRouter, Depends, Query, status
 
-from app.application.jam_use_cases import JamUseCases
-from app.presentation.dependencies import get_jam_use_cases
+from app.application.dtos.jam_dtos import (
+    CreateJamInput,
+    VoteJamTrackInput,
+    VoteSkipJamTrackInput,
+)
+from app.presentation.dependencies import (
+    get_advance_jam_playback_use_case,
+    get_create_jam_use_case,
+    get_jam_state_use_case,
+    get_join_jam_use_case,
+    get_vote_jam_track_use_case,
+    get_vote_skip_jam_track_use_case,
+)
 from app.presentation.schemas import (
-    CriarJamRequest,
-    EntrarJamRequest,
-    JamFilaResponse,
+    ActionSuccessResponse,
+    CreateJamRequest,
+    JamQueueItemResponse,
     JamResponse,
-    MusicaResponse,
-    PularMusicaJamRequest,
-    VotarMusicaJamRequest,
+    JamStateResponse,
+    JoinJamRequest,
+    SkipJamTrackRequest,
+    VoteJamTrackRequest,
 )
 
-router = APIRouter(prefix="/api/jams", tags=["Jams Colaborativas"])
+if TYPE_CHECKING:
+    from app.application.use_cases.jam import (
+        AdvanceJamPlaybackUseCase,
+        CreateJamUseCase,
+        GetJamStateUseCase,
+        JoinJamUseCase,
+        VoteJamTrackUseCase,
+        VoteSkipJamTrackUseCase,
+    )
+
+router = APIRouter(prefix="/api/jams", tags=["Collaborative Jams"])
 
 
 @router.post("", response_model=JamResponse, status_code=status.HTTP_201_CREATED)
-def criar_jam(
-    req: CriarJamRequest,
-    use_cases: JamUseCases = Depends(get_jam_use_cases),
+def create_jam(
+    req: CreateJamRequest,
+    use_case: Annotated[CreateJamUseCase, Depends(get_create_jam_use_case)],
 ) -> JamResponse:
-    jam = use_cases.criar_jam(
-        host_usuario_id=req.host_usuario_id,
-        nome_sala=req.nome_sala,
+    jam = use_case.execute(
+        CreateJamInput(
+            host_user_id=req.host_user_id,
+            room_name=req.room_name,
+        )
     )
     return JamResponse.model_validate(jam)
 
 
-@router.post("/entrar", response_model=JamResponse)
-def entrar_jam(
-    req: EntrarJamRequest,
-    use_cases: JamUseCases = Depends(get_jam_use_cases),
+@router.post("/join", response_model=JamResponse)
+def join_jam(
+    req: JoinJamRequest,
+    use_case: Annotated[JoinJamUseCase, Depends(get_join_jam_use_case)],
 ) -> JamResponse:
-    jam = use_cases.entrar_na_jam(codigo_sala=req.codigo_sala)
+    jam = use_case.execute(room_code=req.room_code)
     return JamResponse.model_validate(jam)
 
 
-@router.get("/{jam_id}/estado")
-def obter_estado(
+@router.get("/{jam_id}/state", response_model=JamStateResponse)
+def get_jam_state(
     jam_id: int,
-    usuario_id: int = Query(...),
-    use_cases: JamUseCases = Depends(get_jam_use_cases),
-) -> dict[str, Any]:
-    estado = use_cases.obter_estado_e_checar_progresso(
-        jam_id=jam_id, usuario_id=usuario_id
+    user_id: Annotated[int, Query()],
+    use_case: Annotated[GetJamStateUseCase, Depends(get_jam_state_use_case)],
+) -> JamStateResponse:
+    state = use_case.execute(jam_id=jam_id, user_id=user_id)
+    return JamStateResponse.model_validate(state)
+
+
+@router.post("/{jam_id}/vote", response_model=JamQueueItemResponse)
+def vote_jam_track(
+    jam_id: int,
+    req: VoteJamTrackRequest,
+    use_case: Annotated[VoteJamTrackUseCase, Depends(get_vote_jam_track_use_case)],
+) -> JamQueueItemResponse:
+    queue_item = use_case.execute(
+        VoteJamTrackInput(
+            jam_id=jam_id,
+            track_id=req.track_id,
+            user_id=req.user_id,
+            points=req.points,
+        )
     )
-    return {
-        "jam": JamResponse.model_validate(estado["jam"]),
-        "musica_atual": (
-            MusicaResponse.model_validate(estado["musica_atual"])
-            if estado["musica_atual"]
-            else None
-        ),
-        "fila": [JamFilaResponse.model_validate(f) for f in estado["fila"]],
-    }
+    return JamQueueItemResponse.model_validate(queue_item)
 
 
-@router.post("/{jam_id}/votar", response_model=JamFilaResponse)
-def votar_musica(
+@router.post("/{jam_id}/skip", response_model=ActionSuccessResponse)
+def skip_jam_track(
     jam_id: int,
-    req: VotarMusicaJamRequest,
-    use_cases: JamUseCases = Depends(get_jam_use_cases),
-) -> JamFilaResponse:
-    fila_item = use_cases.votar_musica_fila(
-        jam_id=jam_id,
-        musica_id=req.musica_id,
-        usuario_id=req.usuario_id,
-        pontos=req.pontos,
+    req: SkipJamTrackRequest,
+    use_case: Annotated[
+        VoteSkipJamTrackUseCase, Depends(get_vote_skip_jam_track_use_case)
+    ],
+) -> ActionSuccessResponse:
+    use_case.execute(
+        VoteSkipJamTrackInput(
+            jam_id=jam_id,
+            track_id=req.track_id,
+            user_id=req.user_id,
+        )
     )
-    return JamFilaResponse.model_validate(fila_item)
+    return ActionSuccessResponse(success=True)
 
 
-@router.post("/{jam_id}/pular")
-def pular_musica(
+@router.post("/{jam_id}/advance", response_model=JamResponse)
+def advance_jam_playback(
     jam_id: int,
-    req: PularMusicaJamRequest,
-    use_cases: JamUseCases = Depends(get_jam_use_cases),
-) -> dict[str, bool]:
-    use_cases.votar_musica_pular(
-        jam_id=jam_id,
-        musica_id=req.musica_id,
-        usuario_id=req.usuario_id,
-    )
-    return {"sucesso": True}
-
-
-@router.post("/{jam_id}/avancar", response_model=JamResponse)
-def avancar_jam(
-    jam_id: int,
-    solicitante_usuario_id: int | None = Query(None),
-    use_cases: JamUseCases = Depends(get_jam_use_cases),
+    requester_user_id: Annotated[int, Query()],
+    use_case: Annotated[
+        AdvanceJamPlaybackUseCase, Depends(get_advance_jam_playback_use_case)
+    ],
 ) -> JamResponse:
-    jam = use_cases.iniciar_ou_avancar_jam(
+    jam = use_case.execute(
         jam_id=jam_id,
-        solicitante_usuario_id=solicitante_usuario_id,
+        requester_user_id=requester_user_id,
     )
     return JamResponse.model_validate(jam)
