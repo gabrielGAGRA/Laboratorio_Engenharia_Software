@@ -1,11 +1,15 @@
 """Infrastructure layer package providing external I/O adapters and persistence."""
 
 from app.infrastructure.adapters import (
-    DEFAULT_DATABASE_PATH,
-    ExternalMusicServiceAdapter,
     ITunesAdapter,
-    PBKDF2PasswordHasher,
     SpotifyAdapter,
+)
+from app.infrastructure.persistence import (
+    DEFAULT_DATABASE_PATH,
+    create_connection,
+    transaction,
+)
+from app.infrastructure.repositories import (
     SQLiteInteractionRepository,
     SQLiteJamRepository,
     SQLitePlanRepository,
@@ -13,14 +17,11 @@ from app.infrastructure.adapters import (
     SQLiteReviewRepository,
     SQLiteTrackRepository,
     SQLiteUserRepository,
-    create_connection,
-    init_db,
-    transaction,
 )
+from app.infrastructure.security import PBKDF2PasswordHasher
 
 __all__ = [
     "DEFAULT_DATABASE_PATH",
-    "ExternalMusicServiceAdapter",
     "ITunesAdapter",
     "PBKDF2PasswordHasher",
     "SQLiteInteractionRepository",
@@ -32,6 +33,5 @@ __all__ = [
     "SQLiteUserRepository",
     "SpotifyAdapter",
     "create_connection",
-    "init_db",
     "transaction",
 ]

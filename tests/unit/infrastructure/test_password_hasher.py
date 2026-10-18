@@ -1,6 +1,6 @@
 """Unit tests for PBKDF2PasswordHasher adapter."""
 
-from app.infrastructure.adapters.security.password_hasher import (
+from app.infrastructure.security.password_hasher import (
     PBKDF2PasswordHasher,
 )
 

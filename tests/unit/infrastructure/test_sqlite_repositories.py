@@ -1,7 +1,6 @@
 """Unit tests for SQLite repositories implementing domain/application ports."""
 
 import sqlite3
-from pathlib import Path
 
 import pytest
 
@@ -16,7 +15,8 @@ from app.domain.models import (
     Track,
     User,
 )
-from app.infrastructure.adapters.sqlite.repositories import (
+from app.infrastructure.persistence.connection import SCHEMA_PATH
+from app.infrastructure.repositories import (
     SQLiteInteractionRepository,
     SQLiteJamRepository,
     SQLitePlanRepository,
@@ -24,15 +24,6 @@ from app.infrastructure.adapters.sqlite.repositories import (
     SQLiteReviewRepository,
     SQLiteTrackRepository,
     SQLiteUserRepository,
-)
-
-SCHEMA_PATH = (
-    Path(__file__).parents[3]
-    / "app"
-    / "infrastructure"
-    / "adapters"
-    / "sqlite"
-    / "schema.sql"
 )
 
 
@@ -99,7 +90,9 @@ def test_track_and_interaction_repositories(conn: sqlite3.Connection) -> None:
     track_repo = SQLiteTrackRepository(conn)
     interaction_repo = SQLiteInteractionRepository(conn)
 
-    plan = plan_repo.save(Plan(name="Free", initial_monthly_price=0.0, initial_max_profiles=1))
+    plan = plan_repo.save(
+        Plan(name="Free", initial_monthly_price=0.0, initial_max_profiles=1)
+    )
     user = user_repo.save(
         User(
             email="jane@example.com",
@@ -119,7 +112,7 @@ def test_track_and_interaction_repositories(conn: sqlite3.Connection) -> None:
             explicit=False,
         )
     )
-    t2 = track_repo.save(
+    _ = track_repo.save(
         Track(
             title="Rap God",
             artist="Eminem",

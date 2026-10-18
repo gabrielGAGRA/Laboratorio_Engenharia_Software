@@ -17,9 +17,7 @@ from app.application.ports.services import (
     TrackCatalogPort,
     TrackPreviewPort,
 )
-from app.infrastructure.adapters.itunes import ITunesAdapter
-from app.infrastructure.adapters.security import PBKDF2PasswordHasher
-from app.infrastructure.adapters.spotify import SpotifyAdapter
+from app.infrastructure.adapters import ITunesAdapter, SpotifyAdapter
 from app.infrastructure.repositories import (
     InteractionRepository,
     JamRepository,
@@ -36,6 +34,7 @@ from app.infrastructure.repositories import (
     TrackRepository,
     UserRepository,
 )
+from app.infrastructure.security import PBKDF2PasswordHasher
 
 
 def test_repository_contract_compliance() -> None:

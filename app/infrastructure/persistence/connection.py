@@ -2,12 +2,11 @@
 
 import sqlite3
 from contextlib import contextmanager
-from typing import TYPE_CHECKING
+from pathlib import Path
+lazy from collections.abc import Generator
 
-if TYPE_CHECKING:
-    from collections.abc import Generator
-
-DEFAULT_DATABASE_PATH = "ribbit_local.db"
+DEFAULT_DATABASE_PATH = "local.db"
+SCHEMA_PATH = Path(__file__).parent / "schema.sql"
 
 
 def create_connection(database_path: str = DEFAULT_DATABASE_PATH) -> sqlite3.Connection:
@@ -30,6 +29,3 @@ def transaction(conn: sqlite3.Connection) -> Generator[sqlite3.Cursor]:
         raise
     finally:
         cursor.close()
-
-
-__all__ = ["DEFAULT_DATABASE_PATH", "create_connection", "transaction"]

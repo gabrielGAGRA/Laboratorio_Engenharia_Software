@@ -38,6 +38,3 @@ class PBKDF2PasswordHasher(PasswordHasherPort):
             return secrets.compare_digest(actual_key, expected_key)
         except ValueError, TypeError:
             return False
-
-
-__all__ = ["PBKDF2PasswordHasher"]

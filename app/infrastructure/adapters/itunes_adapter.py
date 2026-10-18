@@ -1,6 +1,5 @@
 """iTunes Search API adapter implementing TrackPreviewPort."""
 
-import logging
 from http import HTTPStatus
 
 import niquests
@@ -10,8 +9,6 @@ from app.application.ports.services.music_service import (
     TrackPreviewPort,
 )
 from app.domain.exceptions import ExternalServiceError
-
-logger = logging.getLogger(__name__)
 
 
 class ITunesAdapter(TrackPreviewPort):
@@ -27,7 +24,7 @@ class ITunesAdapter(TrackPreviewPort):
             ExternalServiceError: If the external provider fails or times out.
         """
         try:
-            params = {"term": term, "media": "music", "limit": 1}
+            params = {"term": term, "media": "music", "limit": "1"}
             res = self._session.get(
                 "https://itunes.apple.com/search",
                 params=params,
@@ -52,12 +49,8 @@ class ITunesAdapter(TrackPreviewPort):
                 details={"status_code": res.status_code, "term": term},
             )
         except niquests.RequestException as exc:
-            logger.warning("Error querying iTunes API: %s", exc)
             raise ExternalServiceError(
                 f"Failed to communicate with iTunes search API: {exc}",
                 service_name="iTunes",
                 details={"term": term},
             ) from exc
-
-
-__all__ = ["ITunesAdapter"]

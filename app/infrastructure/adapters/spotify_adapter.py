@@ -1,15 +1,7 @@
 """Spotify API adapter implementing TrackCatalogPort and PlaylistExportPort."""
 
-from __future__ import annotations
-
-import logging
 from http import HTTPStatus
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from collections.abc import Sequence
-
-    from app.domain.types import ExternalTrackId
+lazy from collections.abc import Sequence
 
 import niquests
 
@@ -19,8 +11,7 @@ from app.application.ports.services.music_service import (
     TrackCatalogPort,
 )
 from app.domain.exceptions import ExternalServiceError
-
-logger = logging.getLogger(__name__)
+lazy from app.domain.models.track import ExternalTrackId
 
 
 class SpotifyAdapter(TrackCatalogPort, PlaylistExportPort):
@@ -45,7 +36,7 @@ class SpotifyAdapter(TrackCatalogPort, PlaylistExportPort):
 
         try:
             headers = {"Authorization": f"Bearer {self._spotify_token}"}
-            params = {"q": query, "type": "track", "limit": limit}
+            params = {"q": query, "type": "track", "limit": str(limit)}
             res = self._session.get(
                 "https://api.spotify.com/v1/search",
                 headers=headers,
@@ -73,7 +64,6 @@ class SpotifyAdapter(TrackCatalogPort, PlaylistExportPort):
                 details={"status_code": res.status_code, "query": query},
             )
         except niquests.RequestException as exc:
-            logger.warning("Error querying Spotify API: %s", exc)
             raise ExternalServiceError(
                 f"Failed to communicate with Spotify API: {exc}",
                 service_name="Spotify",
@@ -89,6 +79,3 @@ class SpotifyAdapter(TrackCatalogPort, PlaylistExportPort):
             ExternalServiceError: If Spotify API communication fails.
         """
         return f"spotify:playlist:{hash(name + account_id) & 0xFFFFFFF}"
-
-
-__all__ = ["SpotifyAdapter"]

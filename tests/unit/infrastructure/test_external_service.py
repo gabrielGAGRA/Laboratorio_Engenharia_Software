@@ -6,11 +6,11 @@ import niquests
 import pytest
 
 from app.domain.exceptions import ExternalServiceError
-from app.infrastructure.adapters.music_service import ExternalMusicServiceAdapter
+from app.infrastructure.adapters.itunes_adapter import ITunesAdapter
 
 
 def test_find_preview_raises_external_service_error_on_network_failure() -> None:
-    adapter = ExternalMusicServiceAdapter()
+    adapter = ITunesAdapter()
 
     with (
         patch(
