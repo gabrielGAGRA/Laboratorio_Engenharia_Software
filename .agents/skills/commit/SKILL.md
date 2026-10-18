@@ -10,9 +10,9 @@ description: >-
 
 ### A. Commits
 
-6.	Feature branch: If the current branch is a base main, offer ro create  a branch as
-	2.	Name with existing prefixes: feat/, fix/, refact/ + short kebab slug.
-	if accepted, give the user a PR title and body draft using the PR Message Draft Rules below.
+1.	Feature branch: If the current branch is a base main, offer to create a branch. Branches should separate every change by context, always offer to create when the goal changed (e.g. a refact changed to a feature).
+	1.1.	Name with existing prefixes: feat/, fix/, refact/ + short kebab slug.
+	1.2.	If accepted, give the user a PR title and body draft using the PR Message Draft Rules below.
 2.	One logical purpose per commit.
 3.	Draft following the Rules below.
 4.	Commit with hooks disabled.
