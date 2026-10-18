@@ -1,10 +1,12 @@
 """Domain model for track community reviews and comments."""
 
 from dataclasses import InitVar, dataclass, field
-from typing import ClassVar, Self
-from datetime import datetime
+from typing import TYPE_CHECKING, ClassVar, Self
 
 from app.domain.exceptions import BusinessRuleViolationError
+
+if TYPE_CHECKING:
+    from datetime import datetime
 
 
 @dataclass(slots=True, kw_only=True, eq=False)

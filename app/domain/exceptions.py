@@ -1,42 +1,127 @@
-"""Domain exception hierarchy. Pure Python, no HTTP or transport semantics."""
+"""Domain exception hierarchy."""
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 
 class CustomError(Exception):
-    """Root domain exception."""
-
     def __init__(
         self,
         message: str,
         name: str | None = None,
-        details: dict[str, Any] | None = None,
+        details: Mapping[str, Any] | None = None,
     ) -> None:
         super().__init__(message)
         self.message = message
         self.name = name or self.__class__.__name__
-        self.details = details or {}
+        self.details: dict[str, Any] = dict(details or {})
 
 
 class DomainError(CustomError):
-    """Base error for business rule failures."""
+    pass
 
 
 class EntityNotFoundError(DomainError):
-    """Raised when a requested domain entity does not exist."""
+    def __init__(
+        self,
+        message: str | None = None,
+        entity_name: str | None = None,
+        entity_id: int | str | None = None,
+        details: Mapping[str, Any] | None = None,
+    ) -> None:
+        ctx = dict(details or {})
+        if entity_name:
+            ctx["entity_name"] = entity_name
+        if entity_id is not None:
+            ctx["entity_id"] = entity_id
+        default_message = (
+            f"Entity '{entity_name}' with id '{entity_id}' not found."
+            if entity_name and entity_id is not None
+            else "Requested entity was not found."
+        )
+        super().__init__(message or default_message, details=ctx)
 
 
 class BusinessRuleViolationError(DomainError):
-    """Raised when an operation violates a domain invariant or business rule."""
+    def __init__(
+        self,
+        message: str,
+        rule_name: str | None = None,
+        details: Mapping[str, Any] | None = None,
+    ) -> None:
+        ctx = dict(details or {})
+        if rule_name:
+            ctx["rule_name"] = rule_name
+        super().__init__(message, details=ctx)
 
 
 class DuplicateEntityError(DomainError):
-    """Raised when attempting to create an entity that already exists."""
+    """The conflicting value is deliberately not recorded: it may be personal data."""
+
+    def __init__(
+        self,
+        message: str | None = None,
+        entity_name: str | None = None,
+        field: str | None = None,
+        details: Mapping[str, Any] | None = None,
+    ) -> None:
+        ctx = dict(details or {})
+        if entity_name:
+            ctx["entity_name"] = entity_name
+        if field:
+            ctx["field"] = field
+        default_message = (
+            f"Entity '{entity_name}' with {field} already exists."
+            if entity_name and field
+            else "Entity already registered."
+        )
+        super().__init__(message or default_message, details=ctx)
 
 
-class UnauthorizedError(DomainError):
-    """Raised when authentication credentials are missing or invalid."""
+class ExternalServiceError(DomainError):
+    """Raised when an external service or provider fails, abstracting transport errors."""
+
+    def __init__(
+        self,
+        message: str = "External service unavailable or returned an error.",
+        service_name: str | None = None,
+        details: Mapping[str, Any] | None = None,
+    ) -> None:
+        ctx = dict(details or {})
+        if service_name:
+            ctx["service_name"] = service_name
+        super().__init__(message, details=ctx)
 
 
-class ForbiddenError(DomainError):
-    """Raised when user permissions or subscription level are insufficient."""
+class AuthenticationRequiredError(DomainError):
+    def __init__(
+        self,
+        message: str = "Authentication required.",
+        details: Mapping[str, Any] | None = None,
+    ) -> None:
+        super().__init__(message, details=details)
+
+
+class PermissionDeniedError(DomainError):
+    def __init__(
+        self,
+        message: str = "Permission denied.",
+        details: Mapping[str, Any] | None = None,
+    ) -> None:
+        super().__init__(message, details=details)
+
+
+__all__ = [
+    "AuthenticationRequiredError",
+    "BusinessRuleViolationError",
+    "CustomError",
+    "DomainError",
+    "DuplicateEntityError",
+    "EntityNotFoundError",
+    "ExternalServiceError",
+    "PermissionDeniedError",
+    "PermissionDeniedError",
+    "AuthenticationRequiredError",
+]

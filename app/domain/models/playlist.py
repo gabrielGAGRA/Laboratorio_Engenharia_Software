@@ -1,12 +1,15 @@
 """Domain model representing a playlist entity."""
 
 from dataclasses import InitVar, dataclass, field
-from typing import Self
-from collections.abc import Sequence
-from datetime import datetime
+from typing import TYPE_CHECKING, Self
 
 from app.domain.exceptions import BusinessRuleViolationError
-from app.domain.models.track import Track
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+    from datetime import datetime
+
+    from app.domain.models.track import Track
 
 
 @dataclass(slots=True, kw_only=True, eq=False)

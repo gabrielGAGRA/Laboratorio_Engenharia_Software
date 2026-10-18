@@ -1,10 +1,12 @@
 """Domain model representing a platform user."""
 
 from dataclasses import dataclass
-from typing import ClassVar, Self
-from datetime import datetime
+from typing import TYPE_CHECKING, ClassVar, Self
 
-from app.domain.models.track import Track
+if TYPE_CHECKING:
+    from datetime import datetime
+
+    from app.domain.models.track import Track
 
 
 @dataclass(slots=True, kw_only=True, eq=False)

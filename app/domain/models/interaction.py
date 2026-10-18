@@ -2,7 +2,10 @@
 
 from dataclasses import dataclass
 from enum import StrEnum
-from datetime import datetime
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from datetime import datetime
 
 
 class InteractionAction(StrEnum):

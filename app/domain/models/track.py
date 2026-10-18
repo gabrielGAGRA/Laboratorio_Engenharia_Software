@@ -1,8 +1,10 @@
 """Domain model representing a music track."""
 
 from dataclasses import dataclass
-from typing import Self
-from datetime import datetime
+from typing import TYPE_CHECKING, Self
+
+if TYPE_CHECKING:
+    from datetime import datetime
 
 
 @dataclass(slots=True, kw_only=True, eq=False)
