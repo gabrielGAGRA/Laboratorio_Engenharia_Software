@@ -87,6 +87,14 @@ extend-ignore-names = ["main", "_"]
 
 [tool.ruff.lint.flake8-type-checking]
 runtime-evaluated-base-classes = ["pydantic.BaseModel"]
+runtime-evaluated-decorators = [
+    "fastapi.APIRouter.get",
+    "fastapi.APIRouter.post",
+    "fastapi.APIRouter.put",
+    "fastapi.APIRouter.delete",
+    "fastapi.APIRouter.patch",
+]
+exempt-modules = ["fastapi", "typing"]
 
 [tool.ruff.lint.flake8-tidy-imports]
 ban-relative-imports = "all"

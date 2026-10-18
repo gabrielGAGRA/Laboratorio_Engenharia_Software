@@ -3,30 +3,28 @@
 
 
 ### Time: Crazy Frogs
-Membros:
 - Carolina Britto Haddad
 - Fernando Mendes Seraco
 - Gabriel Agra de Castro Motta
 - Mateus Silva de Araújo
 
 ## Sumário
-- [Sobre o Projeto](#-sobre-o-projeto)
+- [Sobre](#-sobre)
 - [Funcionalidades](#-funcionalidades)
-  - [Aplicativo Mobile](#aplicativo-mobile)
-  - [Painel Administrativo (Web)](#painel-administrativo-web)
+  - [Aplicativo](#aplicativo)
+  - [Painel Administrativo](#painel-administrativo)
 - [Arquitetura e Tecnologias](#-arquitetura-e-tecnologias)
-- [Estrutura de Pastas](#-estrutura-de-pastas)
 - [Como Executar](#-como-executar)
 
 ---
 
-## Sobre o Projeto
+## Sobre
 
-O **Ribbit** redefine a experiência de encontrar novas músicas através de uma mecânica interativa inspirada em cartões de *swipe*, aliando geração dinâmica de playlists, sessões colaborativas em tempo real (*Jams*) e controle rígido de privacidade musical. 
+O **Ribbit** redefine a experiência de ouvir novas músicas através de uma mecânica interativa inspirada em *swipe*, usando da geração dinâmica de playlists e sessões colaborativas em tempo real (*Jams*).
 
 O projeto é composto por duas frentes:
 1. **Ribbit**: Aplicativo voltado ao usuário final para descoberta, criação de playlists inteligentes e interação social em grupo.
-2. **Ribbit Admin Console**: Painel web restrito para curadoria de catálogo com *Soft Delete* e monitoramento de métricas financeiras.
+2. **Ribbit Admin Console**: Painel web restrito para curadoria de catálogo com *soft delete* e monitoramento de métricas.
 
 ---
 
@@ -94,107 +92,39 @@ O projeto é composto por duas frentes:
 
 ## Arquitetura e Tecnologias
 
-- **Frontend**: TypeScript e Angular (Framework).
-- **Backend**: Python -- FastAPI.
+- **Frontend**: TypeScript e Angular.
+- **Backend**: Python.
 
 ---
 
-## Estrutura de Pastas
-
-```
-Laboratorio_Engenharia_Software/
-├── app/
-│   ├── main.py                        # Bootstrap FastAPI + lifespan (seed + routers)
-│   ├── domain/                        # Camada de Domínio — Python puro
-│   │   ├── entities.py                # Dataclasses: Plano, Usuario, Musica, Interacao, Playlist, Jam, etc.
-│   │   ├── ports.py                   # ABCs: repositórios e serviço externo de música
-│   │   └── exceptions.py             # Hierarquia de erros de domínio
-│   ├── application/                   # Casos de Uso — orquestração pura
-│   │   ├── auth_use_cases.py
-│   │   ├── descoberta_use_cases.py
-│   │   ├── playlist_use_cases.py
-│   │   ├── perfil_use_cases.py
-│   │   ├── jam_use_cases.py
-│   │   ├── review_use_cases.py
-│   │   └── admin_use_cases.py
-│   ├── infrastructure/                # Adaptadores de I/O
-│   │   ├── database.py               # Engine SQLAlchemy + get_db()
-│   │   ├── db_models.py              # Modelos ORM (9 tabelas)
-│   │   ├── repositories.py           # Implementações concretas dos ports
-│   │   ├── apis_externas.py          # Adaptadores Spotify + iTunes
-│   │   └── seed.py                   # Dados iniciais: 3 planos + 5 músicas de amostra
-│   └── presentation/                  # Camada HTTP
-│       ├── schemas.py                 # DTOs Pydantic v2
-│       ├── dependencies.py            # Injeção de dependência (DI)
-│       └── routers/
-│           ├── auth.py               # POST /api/auth/cadastrar, /login
-│           ├── descoberta.py         # GET /api/descoberta/proxima, POST /interagir
-│           ├── playlists.py          # CRUD de playlists + exportação Spotify
-│           ├── jams.py               # Criação e votação de Jams colaborativas
-│           ├── musicas_reviews.py    # Busca de músicas + reviews da comunidade
-│           ├── perfil.py             # Perfil, planos, família e estatísticas Premium
-│           └── admin.py              # Painel admin (protegido por X-Admin-Id)
-├── tests/
-│   ├── test_domain.py
-│   ├── test_infrastructure.py
-│   ├── test_application.py
-│   └── test_e2e_flow.py
-├── docs/
-│   ├── architecture/app/database/    # Esquemas SQL das 9 tabelas
-│   └── llm/app/                      # Guias para IAs: arquitetura, domínio, regras Python
-├── .agents/                           # Regras e skills do agente de IA
-├── pyproject.toml                     # Dependências e configuração Ruff/pytest
-└── TODO.md                            # Itens abertos para próximas versões
-```
 
 ## Como Executar
 
 ### Pré-requisitos
 
-- Python 3.15 com [`uv`](https://docs.astral.sh/uv/) instalado
-- (Opcional) PostgreSQL para produção; SQLite é usado localmente por padrão
-
 ### 1. Instalar dependências
 
-```bash
 uv sync
-```
 
-### 2. Configurar variáveis de ambiente (opcional)
+### 2. Configurar variáveis de ambiente
 
-Crie um `.env` na raiz ou exporte no shell:
-
-```bash
-# SQLite local (padrão — sem configuração necessária)
-# DATABASE_URL=sqlite:///./ribbit_local.db
-
-# PostgreSQL (produção)
-# DATABASE_URL=postgresql://user:senha@localhost:5432/ribbit
-
-# Integrações externas (opcional para V0)
-# SPOTIFY_CLIENT_ID=...
-# SPOTIFY_CLIENT_SECRET=...
-```
 
 ### 3. Subir o servidor
 
-```bash
 uv run uvicorn app.main:app --reload
-```
-
-O banco SQLite (`ribbit_local.db`) e os dados de seed (3 planos + 5 músicas) são criados automaticamente na primeira inicialização.
 
 Acesse a documentação interativa em: **http://localhost:8000/docs**
 
 ### 4. Rodar os testes
 
-```bash
+```
 uv run pytest
 ```
 
-### 5. Quality gate (lint + format)
+### 5. Quality gate
 
-```bash
-uv run ruff format
-uv run ruff check --fix
+```
+uv run ruff format;
+uv run ruff check --fix;
+uv run zuban check;
 ```
