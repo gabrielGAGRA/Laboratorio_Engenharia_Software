@@ -1,6 +1,7 @@
 """Application ports: contracts the application layer needs from infrastructure."""
 
 from app.application.ports.repositories import (
+    AuditLogRepositoryPort,
     InteractionRepositoryPort,
     JamRepositoryPort,
     PlanRepositoryPort,
@@ -19,6 +20,7 @@ from app.application.ports.services import (
 )
 
 __all__ = [
+    "AuditLogRepositoryPort",
     "CatalogTrack",
     "InteractionRepositoryPort",
     "JamRepositoryPort",

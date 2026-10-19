@@ -135,3 +135,6 @@ class SQLiteReviewRepository(ReviewRepositoryPort):
             (review_id, user_id, created_at_str),
         )
         self.conn.commit()
+
+
+__all__ = ["SQLiteReviewRepository"]

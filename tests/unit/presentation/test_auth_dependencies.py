@@ -1,12 +1,20 @@
-"""Unit tests for user authentication dependencies."""
+"""Unit tests for user and admin authentication dependencies."""
 
 from unittest.mock import MagicMock
 
 import pytest
 
-from app.domain.exceptions import AuthenticationRequiredError
+from app.domain.exceptions import (
+    AuthenticationRequiredError,
+    PermissionDeniedError,
+)
 from app.domain.models import User
-from app.presentation.dependencies.auth import get_current_user_id, require_user
+from app.presentation.dependencies.auth import (
+    get_admin_id,
+    get_current_user_id,
+    require_admin,
+    require_user,
+)
 
 
 def test_get_current_user_id_bearer_token() -> None:
@@ -30,12 +38,15 @@ def test_get_current_user_id_query_param_fallback() -> None:
 
 
 def test_get_current_user_id_precedence() -> None:
-    # Authorization header should precede X-User-Id and query param
     assert (
         get_current_user_id(authorization="Bearer 1", x_user_id="2", user_id="3") == 1
     )
-    # X-User-Id should precede query param
     assert get_current_user_id(x_user_id="2", user_id="3") == 2
+
+
+def test_get_current_user_id_whitespace_fallback() -> None:
+    assert get_current_user_id(authorization="   ", x_user_id="55") == 55
+    assert get_current_user_id(authorization="   ", x_user_id="  ", user_id="66") == 66
 
 
 def test_get_current_user_id_missing_all_raises_error() -> None:
@@ -46,6 +57,9 @@ def test_get_current_user_id_missing_all_raises_error() -> None:
 def test_get_current_user_id_invalid_int_raises_error() -> None:
     with pytest.raises(AuthenticationRequiredError, match="Invalid user ID"):
         get_current_user_id(authorization="Bearer not_a_number")
+
+    with pytest.raises(AuthenticationRequiredError, match="Invalid user ID"):
+        get_current_user_id(authorization="CustomScheme token extra")
 
     with pytest.raises(AuthenticationRequiredError, match="Invalid user ID"):
         get_current_user_id(x_user_id="invalid")
@@ -77,3 +91,68 @@ def test_require_user_not_found_raises_error() -> None:
 
     with pytest.raises(AuthenticationRequiredError, match="User not found"):
         require_user(request=request, user_id=999)
+
+
+def test_get_admin_id_valid_header_returns_int() -> None:
+    assert get_admin_id(header="1") == 1
+
+
+def test_get_admin_id_missing_header_raises_error() -> None:
+    with pytest.raises(
+        AuthenticationRequiredError, match="Administrator ID header missing"
+    ):
+        get_admin_id(header=None)
+
+
+def test_get_admin_id_invalid_int_raises_error() -> None:
+    with pytest.raises(
+        AuthenticationRequiredError, match="Invalid administrator ID header"
+    ):
+        get_admin_id(header="not_an_int")
+
+
+def test_require_admin_success() -> None:
+    admin_user = User(
+        user_id=1,
+        email="admin@ribbit.com",
+        password_hash="pw",
+        display_name="Admin",
+        age=30,
+        plan_id=1,
+        is_admin=True,
+    )
+    request = MagicMock()
+    request.app.state.container.user_repo.find_by_id.return_value = admin_user
+
+    result = require_admin(request=request, admin_id=1)
+    assert result == 1
+    request.app.state.container.user_repo.find_by_id.assert_called_once_with(1)
+
+
+def test_require_admin_user_not_found_raises_authentication_error() -> None:
+    request = MagicMock()
+    request.app.state.container.user_repo.find_by_id.return_value = None
+
+    with pytest.raises(
+        AuthenticationRequiredError, match="Administrator user not found"
+    ):
+        require_admin(request=request, admin_id=404)
+
+
+def test_require_admin_non_admin_user_raises_permission_denied() -> None:
+    regular_user = User(
+        user_id=2,
+        email="user@ribbit.com",
+        password_hash="pw",
+        display_name="Regular",
+        age=22,
+        plan_id=1,
+        is_admin=False,
+    )
+    request = MagicMock()
+    request.app.state.container.user_repo.find_by_id.return_value = regular_user
+
+    with pytest.raises(
+        PermissionDeniedError, match="Access restricted to administrators"
+    ):
+        require_admin(request=request, admin_id=2)

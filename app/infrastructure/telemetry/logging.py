@@ -4,9 +4,12 @@ import json
 import logging
 import sys
 from collections.abc import Mapping
-from contextvars import ContextVar, Token
+from contextvars import ContextVar
 from datetime import UTC, datetime
 from typing import Any
+lazy from contextvars import Token
+
+type LogPayload = dict[str, Any]
 
 SENSITIVE_KEY_PATTERNS: tuple[str, ...] = (
     "password",
@@ -69,7 +72,7 @@ def reset_correlation_id(token: Token[str | None]) -> None:
 def sanitize_payload(obj: Any) -> Any:
     """Recursively masks sensitive values within dictionaries, lists, and tuples."""
     if isinstance(obj, Mapping):
-        sanitized: dict[str, Any] = {}
+        sanitized: LogPayload = {}
         for key, val in obj.items():
             key_str = str(key).lower()
             if any(pattern in key_str for pattern in SENSITIVE_KEY_PATTERNS):
@@ -85,9 +88,9 @@ def sanitize_payload(obj: Any) -> Any:
 class JSONLogFormatter(logging.Formatter):
     """Serializes log records into structured single-line JSON."""
 
-    def _extract_extras(self, record: logging.LogRecord) -> dict[str, Any]:
+    def _extract_extras(self, record: logging.LogRecord) -> LogPayload:
         """Extracts and sanitizes custom extra attributes from the log record."""
-        extras: dict[str, Any] = {}
+        extras: LogPayload = {}
         for key, val in record.__dict__.items():
             if key.startswith("_") or key in STANDARD_LOG_RECORD_ATTRIBUTES:
                 continue
@@ -117,7 +120,7 @@ class JSONLogFormatter(logging.Formatter):
             else datetime.now(UTC).isoformat()
         )
 
-        data: dict[str, Any] = {
+        data: LogPayload = {
             "timestamp": timestamp,
             "level": record.levelname,
             "logger": record.name,
@@ -165,7 +168,7 @@ def log_operational_event(
             level = logging.INFO
 
     exc_info = extra.pop("exc_info", None)
-    payload: dict[str, Any] = {"event": event, "status": status, **extra}
+    payload: LogPayload = {"event": event, "status": status, **extra}
     logger.log(level, message, exc_info=exc_info, extra=payload)
 
 
@@ -193,6 +196,7 @@ def configure_logging(level: str | int = "INFO") -> logging.Logger:
 
 __all__ = [
     "JSONLogFormatter",
+    "LogPayload",
     "configure_logging",
     "correlation_id_ctx",
     "get_correlation_id",

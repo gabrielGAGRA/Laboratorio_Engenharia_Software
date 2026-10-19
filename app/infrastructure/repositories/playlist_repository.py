@@ -145,3 +145,6 @@ class SQLitePlaylistRepository(PlaylistRepositoryPort):
             return self.find_by_id(new_id) or playlist
         self.conn.commit()
         return playlist
+
+
+__all__ = ["SQLitePlaylistRepository"]

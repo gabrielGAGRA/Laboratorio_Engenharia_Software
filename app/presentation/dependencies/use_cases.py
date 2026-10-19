@@ -1,69 +1,68 @@
 """Dependency providers retrieving application use cases from container state."""
 
-from typing import TYPE_CHECKING, cast
+from typing import cast
 
 from fastapi import Request
 
-if TYPE_CHECKING:
-    from app.application.use_cases.admin import (
-        BlockTrackUseCase,
-        GetAudienceReportUseCase,
-        GetAuditLogsUseCase,
-        GetExecutiveDashboardUseCase,
-        GetTopModerationReviewsUseCase,
-        ListUsersWithPlansUseCase,
-        PromoteUserToAdminUseCase,
-        UpdateSubscriptionPlanUseCase,
-        UpdateTrackExplicitFlagUseCase,
-    )
-    from app.application.use_cases.auth import (
-        AuthenticateAdminUseCase,
-        AuthenticateUserUseCase,
-        RegisterUserUseCase,
-    )
-    from app.application.use_cases.discovery import (
-        GetNextDiscoveryTrackUseCase,
-        RecordSwipeInteractionUseCase,
-    )
-    from app.application.use_cases.jam import (
-        AdvanceJamPlaybackUseCase,
-        CreateJamUseCase,
-        GetJamStateUseCase,
-        JoinJamUseCase,
-        VoteJamTrackUseCase,
-        VoteSkipJamTrackUseCase,
-    )
-    from app.application.use_cases.playlist import (
-        AddTrackToPlaylistUseCase,
-        CreateDeckPlaylistUseCase,
-        ExportPlaylistToSpotifyUseCase,
-        ListUserPlaylistsUseCase,
-    )
-    from app.application.use_cases.review import (
-        GetCommunityFeedUseCase,
-        GetTrackReviewsUseCase,
-        LikeReviewCommentUseCase,
-        PublishReviewUseCase,
-        SearchTracksUseCase,
-    )
-    from app.application.use_cases.user import (
-        AddFamilyMemberUseCase,
-        CancelSubscriptionPlanUseCase,
-        ChangeSubscriptionPlanUseCase,
-        ChangeTrackInteractionUseCase,
-        DeleteUserAccountUseCase,
-        GetAnnualListeningStatsUseCase,
-        GetUserProfileUseCase,
-        LinkSpotifyAccountUseCase,
-        ListBlockedGenresUseCase,
-        ListFamilyMembersUseCase,
-        ListPlansUseCase,
-        ListUserInteractionsUseCase,
-        RemoveFamilyMemberUseCase,
-        UpdateBlockedGenresUseCase,
-        UpdateProfileUseCase,
-    )
-    from app.composition import Container
+lazy from app.application.use_cases.admin import (
+    BlockTrackUseCase,
+    GetAudienceReportUseCase,
+    GetAuditLogsUseCase,
+    GetExecutiveDashboardUseCase,
+    GetTopModerationReviewsUseCase,
+    ListUsersWithPlansUseCase,
+    PromoteUserToAdminUseCase,
+    UpdateSubscriptionPlanUseCase,
+    UpdateTrackExplicitFlagUseCase,
+)
+lazy from app.application.use_cases.auth import (
+    AuthenticateAdminUseCase,
+    AuthenticateUserUseCase,
+    RegisterUserUseCase,
+)
+lazy from app.application.use_cases.discovery import (
+    GetNextDiscoveryTrackUseCase,
+    RecordSwipeInteractionUseCase,
+)
+lazy from app.application.use_cases.jam import (
+    AdvanceJamPlaybackUseCase,
+    CreateJamUseCase,
+    GetJamStateUseCase,
+    JoinJamUseCase,
+    VoteJamTrackUseCase,
+    VoteSkipJamTrackUseCase,
+)
+lazy from app.application.use_cases.playlist import (
+    AddTrackToPlaylistUseCase,
+    CreateDeckPlaylistUseCase,
+    ExportPlaylistToSpotifyUseCase,
+    ListUserPlaylistsUseCase,
+)
+lazy from app.application.use_cases.review import (
+    GetCommunityFeedUseCase,
+    GetTrackReviewsUseCase,
+    LikeReviewCommentUseCase,
+    PublishReviewUseCase,
+    SearchTracksUseCase,
+)
+lazy from app.application.use_cases.user import (
+    AddFamilyMemberUseCase,
+    CancelSubscriptionPlanUseCase,
+    ChangeSubscriptionPlanUseCase,
+    ChangeTrackInteractionUseCase,
+    DeleteUserAccountUseCase,
+    GetAnnualListeningStatsUseCase,
+    GetUserProfileUseCase,
+    LinkSpotifyAccountUseCase,
+    ListBlockedGenresUseCase,
+    ListFamilyMembersUseCase,
+    ListPlansUseCase,
+    ListUserInteractionsUseCase,
+    RemoveFamilyMemberUseCase,
+    UpdateBlockedGenresUseCase,
+    UpdateProfileUseCase,
+)
+lazy from app.composition import Container
 
 
 def _container(request: Request) -> Container:

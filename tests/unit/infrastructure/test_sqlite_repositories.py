@@ -1,6 +1,7 @@
 """Unit tests for SQLite repositories implementing domain/application ports."""
 
 import sqlite3
+lazy from collections.abc import Iterator
 
 import pytest
 
@@ -30,7 +31,7 @@ from app.infrastructure.repositories import (
 
 
 @pytest.fixture
-def conn() -> sqlite3.Connection:
+def conn() -> Iterator[sqlite3.Connection]:
     connection = sqlite3.connect(":memory:")
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA foreign_keys = ON;")
@@ -515,3 +516,309 @@ def test_audit_log_repository(conn: sqlite3.Connection) -> None:
     assert logs[0].status == "SUCCESS"
     assert logs[1].event == "EVENT_B"
     assert logs[1].status == "FAILED"
+
+
+def test_plan_and_user_repositories_update_and_edge_cases(
+    conn: sqlite3.Connection,
+) -> None:
+    plan_repo = SQLitePlanRepository(conn)
+    user_repo = SQLiteUserRepository(conn)
+
+    assert plan_repo.find_by_id(9999) is None
+    assert plan_repo.find_by_name("NonExistent") is None
+    assert plan_repo.list_all() == []
+
+    p1 = plan_repo.save(
+        Plan(name="Basic", initial_monthly_price=5.0, initial_max_profiles=1)
+    )
+    p2 = plan_repo.save(
+        Plan(name="Premium", initial_monthly_price=15.0, initial_max_profiles=2)
+    )
+
+    updated_p1 = Plan(
+        plan_id=p1.plan_id,
+        name="Basic Plus",
+        initial_monthly_price=7.5,
+        initial_max_profiles=2,
+    )
+    saved_p1 = plan_repo.save(updated_p1)
+    assert saved_p1.name == "Basic Plus"
+    assert saved_p1.monthly_price == 7.5
+    assert saved_p1.max_profiles == 2
+
+    all_plans = plan_repo.list_all()
+    assert len(all_plans) == 2
+    assert all_plans[0].name == "Basic Plus"
+    assert all_plans[1].plan_id == p2.plan_id
+
+    assert user_repo.find_by_id(9999) is None
+    assert user_repo.find_by_email("nobody@example.com") is None
+    assert user_repo.delete(9999) is False
+
+    user = user_repo.save(
+        User(
+            email="alice@example.com",
+            password_hash="hash1",
+            display_name="Alice",
+            age=28,
+            plan_id=p1.plan_id,
+            blocked_genres=frozenset(),
+            is_admin=False,
+        )
+    )
+    assert user.user_id is not None
+
+    updated_user = User(
+        user_id=user.user_id,
+        email="alice.new@example.com",
+        password_hash="hash2",
+        display_name="Alice Updated",
+        age=29,
+        plan_id=p2.plan_id,
+        spotify_id="sp_alice_99",
+        blocked_genres=frozenset({"country", "jazz"}),
+        is_admin=True,
+    )
+    saved_updated_user = user_repo.save(updated_user)
+    assert saved_updated_user.email == "alice.new@example.com"
+    assert saved_updated_user.display_name == "Alice Updated"
+    assert saved_updated_user.age == 29
+    assert saved_updated_user.plan_id == p2.plan_id
+    assert saved_updated_user.spotify_id == "sp_alice_99"
+    assert saved_updated_user.blocked_genres == frozenset({"country", "jazz"})
+    assert saved_updated_user.is_admin is True
+
+
+def test_track_repository_update_and_comprehensive_filters(
+    conn: sqlite3.Connection,
+) -> None:
+    track_repo = SQLiteTrackRepository(conn)
+
+    assert track_repo.find_by_id(9999) is None
+
+    t1 = track_repo.save(
+        Track(
+            title="Stairway to Heaven",
+            artist="Led Zeppelin",
+            album="Led Zeppelin IV",
+            duration_seconds=482,
+            genre="Rock",
+            release_year=1971,
+            explicit=False,
+        )
+    )
+    t2 = track_repo.save(
+        Track(
+            title="HUMBLE.",
+            artist="Kendrick Lamar",
+            album="DAMN.",
+            duration_seconds=177,
+            genre="Hip Hop",
+            release_year=2017,
+            explicit=True,
+        )
+    )
+    t3 = track_repo.save(
+        Track(
+            title="Deleted Song",
+            artist="Led Zeppelin",
+            album="Coda",
+            duration_seconds=200,
+            genre="Rock",
+            release_year=1982,
+            is_deleted=False,
+        )
+    )
+
+    assert t1.track_id is not None
+    assert t2.track_id is not None
+    assert t3.track_id is not None
+
+    # Update t3 to mark deleted and change metadata
+    t3_updated = Track(
+        track_id=t3.track_id,
+        title="Deleted Song Updated",
+        artist="Led Zeppelin",
+        album="Coda Deluxe",
+        duration_seconds=210,
+        genre="Rock",
+        release_year=1982,
+        spotify_id="sp_t3",
+        explicit=True,
+        is_deleted=True,
+    )
+    saved_t3 = track_repo.save(t3_updated)
+    assert saved_t3.is_deleted is True
+    assert saved_t3.title == "Deleted Song Updated"
+    assert saved_t3.spotify_id == "sp_t3"
+
+    # list_active with excluded_ids and excluded_genres
+    active_filtered = track_repo.list_active(
+        limit=10,
+        excluded_genres=["Hip Hop", "  "],
+        excluded_ids=[9999],
+    )
+    assert len(active_filtered) == 1
+    assert active_filtered[0].track_id == t1.track_id
+
+    active_excluding_t1 = track_repo.list_active(
+        limit=10,
+        excluded_ids=[t1.track_id],
+    )
+    assert len(active_excluding_t1) == 1
+    assert active_excluding_t1[0].track_id == t2.track_id
+
+    # find_by_filters: query, artist, album, genre, year, pagination, and deleted exclusion
+    assert len(track_repo.find_by_filters()) == 2
+    assert len(track_repo.find_by_filters(query="heaven")) == 1
+    assert len(track_repo.find_by_filters(query="damn")) == 1
+    assert len(track_repo.find_by_filters(album="zeppelin iv")) == 1
+    assert len(track_repo.find_by_filters(genre="rock")) == 1
+    assert len(track_repo.find_by_filters(year=2017)) == 1
+    assert len(track_repo.find_by_filters(year=1982)) == 0  # t3 is deleted
+    assert len(track_repo.find_by_filters(limit=1, offset=1)) == 1
+
+
+def test_playlist_jam_review_interaction_updates_and_missing_cases(
+    conn: sqlite3.Connection,
+) -> None:
+    plan_repo = SQLitePlanRepository(conn)
+    user_repo = SQLiteUserRepository(conn)
+    track_repo = SQLiteTrackRepository(conn)
+    playlist_repo = SQLitePlaylistRepository(conn)
+    jam_repo = SQLiteJamRepository(conn)
+    review_repo = SQLiteReviewRepository(conn)
+    interaction_repo = SQLiteInteractionRepository(conn)
+
+    plan = plan_repo.save(Plan(name="AllInOne", initial_monthly_price=10.0))
+    user = user_repo.save(
+        User(
+            email="tester@example.com",
+            password_hash="pw",
+            display_name="Tester",
+            age=24,
+            plan_id=plan.plan_id,
+        )
+    )
+    t1 = track_repo.save(
+        Track(title="T1", artist="A1", duration_seconds=180, genre="Pop")
+    )
+    t2 = track_repo.save(
+        Track(title="T2", artist="A2", duration_seconds=200, genre="Rock")
+    )
+    assert user.user_id is not None
+    assert t1.track_id is not None
+    assert t2.track_id is not None
+
+    # Playlist missing & update replacing tracks
+    assert playlist_repo.find_by_id(9999) is None
+    pl = playlist_repo.save(
+        Playlist(
+            user_id=user.user_id,
+            name="Initial PL",
+            description="Desc 1",
+            initial_tracks=[t1],
+        )
+    )
+    assert pl.playlist_id is not None
+    updated_pl = playlist_repo.save(
+        Playlist(
+            playlist_id=pl.playlist_id,
+            user_id=user.user_id,
+            name="Updated PL",
+            description="Desc 2",
+            spotify_playlist_id="spotify:playlist:abc",
+            is_exported=True,
+            initial_tracks=[t2],
+        )
+    )
+    assert updated_pl.name == "Updated PL"
+    assert updated_pl.is_exported is True
+    assert len(updated_pl.tracks) == 1
+    assert updated_pl.tracks[0].track_id == t2.track_id
+
+    # Jam missing, update, queue upsert, and remove missing
+    assert jam_repo.find_by_id(9999) is None
+    assert jam_repo.find_by_code("MISSINGCODE") is None
+    assert jam_repo.find_queue_item(9999, 9999) is None
+    assert jam_repo.remove_track_from_queue(9999, 9999) is False
+
+    jam = jam_repo.save(Jam(host_user_id=user.user_id, room_name="Room 1"))
+    assert jam.jam_id is not None
+
+    q1 = jam_repo.save_queue_item(
+        JamQueueItem(jam_id=jam.jam_id, track_id=t1.track_id, initial_vote_points=1)
+    )
+    assert q1.vote_points == 1
+
+    # Upsert existing queue item updates vote_points
+    q1_updated = jam_repo.save_queue_item(
+        JamQueueItem(jam_id=jam.jam_id, track_id=t1.track_id, initial_vote_points=7)
+    )
+    assert q1_updated.vote_points == 7
+
+    # Update Jam state (e.g. closing jam)
+    jam_closed = jam_repo.save(
+        Jam(
+            jam_id=jam.jam_id,
+            host_user_id=user.user_id,
+            room_name="Room 1 Closed",
+            room_code=jam.room_code,
+            is_active=False,
+            current_track_id=t1.track_id,
+        )
+    )
+    assert jam_closed.is_active is False
+    assert jam_closed.current_track_id == t1.track_id
+    # Inactive jam should not be returned by find_by_code
+    assert jam_repo.find_by_code(jam.room_code) is None
+
+    # Review missing & update existing review
+    assert review_repo.find_by_id(9999) is None
+    rev = review_repo.save(
+        ReviewComment(
+            user_id=user.user_id,
+            track_id=t1.track_id,
+            initial_rating=4,
+            text="Good track",
+            initial_likes_count=0,
+        )
+    )
+    assert rev.review_id is not None
+    rev_updated = review_repo.save(
+        ReviewComment(
+            review_id=rev.review_id,
+            user_id=user.user_id,
+            track_id=t1.track_id,
+            initial_rating=5,
+            text="Great track!",
+            initial_likes_count=3,
+            is_deleted=True,
+        )
+    )
+    assert rev_updated.rating == 5
+    assert rev_updated.likes_count == 3
+    assert rev_updated.is_deleted is True
+    # Deleted review excluded from list_by_track and list_top_recent
+    assert review_repo.list_by_track(t1.track_id, limit=10) == []
+    assert review_repo.list_top_recent(days=7, limit=10) == []
+
+    # Interaction find_by_user_and_track and list_by_user with and without action filter
+    assert interaction_repo.find_by_user_and_track(user.user_id, 9999) is None
+    interaction_repo.save(
+        Interaction(
+            user_id=user.user_id, track_id=t1.track_id, action=InteractionAction.LIKE
+        )
+    )
+    interaction_repo.save(
+        Interaction(
+            user_id=user.user_id, track_id=t2.track_id, action=InteractionAction.DISLIKE
+        )
+    )
+    all_user_interactions = interaction_repo.list_by_user(user.user_id)
+    assert len(all_user_interactions) == 2
+    dislike_interactions = interaction_repo.list_by_user(
+        user.user_id, action=InteractionAction.DISLIKE
+    )
+    assert len(dislike_interactions) == 1
+    assert dislike_interactions[0].track_id == t2.track_id

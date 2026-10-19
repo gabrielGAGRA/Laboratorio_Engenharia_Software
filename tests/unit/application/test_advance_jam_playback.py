@@ -4,6 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from app.application.ports.repositories.jam_repository import JamRepositoryPort
 from app.application.use_cases.jam.advance_jam_playback import (
     AdvanceJamPlaybackUseCase,
 )
@@ -26,7 +27,7 @@ def test_advance_playback_success() -> None:
     )
     queue_item = JamQueueItem(jam_id=1, track_id=100, initial_vote_points=5)
 
-    jam_repo = MagicMock()
+    jam_repo = MagicMock(spec=JamRepositoryPort)
     jam_repo.find_by_id.return_value = jam
     jam_repo.list_queue.return_value = [queue_item]
     jam_repo.advance_playback.return_value = expected_jam
@@ -43,7 +44,7 @@ def test_advance_playback_success() -> None:
 
 
 def test_advance_playback_inactive_or_not_found() -> None:
-    jam_repo = MagicMock()
+    jam_repo = MagicMock(spec=JamRepositoryPort)
     jam_repo.find_by_id.return_value = None
 
     use_case = AdvanceJamPlaybackUseCase(jam_repo=jam_repo)
@@ -51,9 +52,24 @@ def test_advance_playback_inactive_or_not_found() -> None:
         use_case.execute(jam_id=1, requester_user_id=10)
 
 
+def test_advance_playback_closed_jam_raises_entity_not_found() -> None:
+    closed_jam = Jam(
+        jam_id=1,
+        host_user_id=10,
+        room_name="Rock Room",
+        is_active=False,
+    )
+    jam_repo = MagicMock(spec=JamRepositoryPort)
+    jam_repo.find_by_id.return_value = closed_jam
+
+    use_case = AdvanceJamPlaybackUseCase(jam_repo=jam_repo)
+    with pytest.raises(EntityNotFoundError, match="Jam room not found or inactive"):
+        use_case.execute(jam_id=1, requester_user_id=10)
+
+
 def test_advance_playback_non_host_forbidden() -> None:
     jam = Jam(jam_id=1, host_user_id=10, room_name="Rock Room", is_active=True)
-    jam_repo = MagicMock()
+    jam_repo = MagicMock(spec=JamRepositoryPort)
     jam_repo.find_by_id.return_value = jam
 
     use_case = AdvanceJamPlaybackUseCase(jam_repo=jam_repo)
@@ -63,7 +79,7 @@ def test_advance_playback_non_host_forbidden() -> None:
 
 def test_advance_playback_empty_queue() -> None:
     jam = Jam(jam_id=1, host_user_id=10, room_name="Rock Room", is_active=True)
-    jam_repo = MagicMock()
+    jam_repo = MagicMock(spec=JamRepositoryPort)
     jam_repo.find_by_id.return_value = jam
     jam_repo.list_queue.return_value = []
 

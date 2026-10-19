@@ -1,5 +1,7 @@
 """Transport-level error handlers mapping domain exceptions to HTTP responses."""
 
+lazy from collections.abc import Mapping
+
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 
@@ -13,14 +15,18 @@ from app.domain.exceptions import (
     PermissionDeniedError,
 )
 
-ERROR_STATUS_MAP: dict[type[CustomError], int] = {
-    EntityNotFoundError: status.HTTP_404_NOT_FOUND,
-    AuthenticationRequiredError: status.HTTP_401_UNAUTHORIZED,
-    PermissionDeniedError: status.HTTP_403_FORBIDDEN,
-    DuplicateEntityError: status.HTTP_409_CONFLICT,
-    BusinessRuleViolationError: status.HTTP_400_BAD_REQUEST,
-    ExternalServiceError: status.HTTP_502_BAD_GATEWAY,
-}
+type ErrorStatusMap = Mapping[type[CustomError], int]
+
+ERROR_STATUS_MAP: ErrorStatusMap = frozendict(  # type: ignore[name-defined]
+    {
+        EntityNotFoundError: status.HTTP_404_NOT_FOUND,
+        AuthenticationRequiredError: status.HTTP_401_UNAUTHORIZED,
+        PermissionDeniedError: status.HTTP_403_FORBIDDEN,
+        DuplicateEntityError: status.HTTP_409_CONFLICT,
+        BusinessRuleViolationError: status.HTTP_400_BAD_REQUEST,
+        ExternalServiceError: status.HTTP_502_BAD_GATEWAY,
+    }
+)
 
 
 def resolve_status_code(exc: CustomError) -> int:
@@ -58,6 +64,7 @@ def register_exception_handlers(app: FastAPI) -> None:
 
 __all__ = [
     "ERROR_STATUS_MAP",
+    "ErrorStatusMap",
     "domain_error_handler",
     "register_exception_handlers",
     "resolve_status_code",

@@ -10,6 +10,7 @@ from app.infrastructure.persistence import (
     transaction,
 )
 from app.infrastructure.repositories import (
+    SQLiteAuditLogRepository,
     SQLiteInteractionRepository,
     SQLiteJamRepository,
     SQLitePlanRepository,
@@ -32,6 +33,7 @@ __all__ = [
     "ITunesAdapter",
     "JSONLogFormatter",
     "PBKDF2PasswordHasher",
+    "SQLiteAuditLogRepository",
     "SQLiteInteractionRepository",
     "SQLiteJamRepository",
     "SQLitePlanRepository",

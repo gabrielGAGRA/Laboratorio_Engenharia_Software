@@ -29,3 +29,11 @@ def transaction(conn: sqlite3.Connection) -> Generator[sqlite3.Cursor]:
         raise
     finally:
         cursor.close()
+
+
+__all__ = [
+    "DEFAULT_DATABASE_PATH",
+    "SCHEMA_PATH",
+    "create_connection",
+    "transaction",
+]

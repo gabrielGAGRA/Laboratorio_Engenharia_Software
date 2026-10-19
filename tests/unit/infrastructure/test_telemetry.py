@@ -221,10 +221,19 @@ def test_log_operational_event_helper() -> None:
 
 @pytest.mark.unit
 def test_configure_logging() -> None:
-    app_logger = configure_logging("DEBUG")
-    assert app_logger.level == logging.DEBUG
-    assert len(app_logger.handlers) == 1
-    assert isinstance(app_logger.handlers[0].formatter, JSONLogFormatter)
+    target_logger = logging.getLogger("app")
+    prev_level = target_logger.level
+    prev_propagate = target_logger.propagate
+    prev_handlers = list(target_logger.handlers)
+    try:
+        app_logger = configure_logging("DEBUG")
+        assert app_logger.level == logging.DEBUG
+        assert len(app_logger.handlers) == 1
+        assert isinstance(app_logger.handlers[0].formatter, JSONLogFormatter)
+    finally:
+        target_logger.setLevel(prev_level)
+        target_logger.propagate = prev_propagate
+        target_logger.handlers = prev_handlers
 
 
 @pytest.mark.unit
@@ -316,6 +325,8 @@ async def test_correlation_id_middleware_captures_unhandled_exception() -> None:
 async def test_correlation_id_middleware_logs_operational_events() -> None:
     capture = LogCaptureHandler(formatter=JSONLogFormatter())
     telemetry_logger = logging.getLogger("app.telemetry.middleware")
+    prev_level = telemetry_logger.level
+    telemetry_logger.setLevel(logging.INFO)
     telemetry_logger.addHandler(capture)
 
     async def successful_app(_request: Request) -> Response:
@@ -360,12 +371,17 @@ async def test_correlation_id_middleware_logs_operational_events() -> None:
         assert fail_event["status_code"] == 502
     finally:
         telemetry_logger.removeHandler(capture)
+        telemetry_logger.setLevel(prev_level)
 
 
 @pytest.mark.unit
 @pytest.mark.anyio
 async def test_lifespan_startup_and_shutdown_operational_events() -> None:
     capture = LogCaptureHandler(formatter=JSONLogFormatter())
+    app_logger = logging.getLogger("app")
+    prev_level = app_logger.level
+    prev_propagate = app_logger.propagate
+    prev_handlers = list(app_logger.handlers)
 
     test_settings = Settings(
         database_path=":memory:",
@@ -373,11 +389,11 @@ async def test_lifespan_startup_and_shutdown_operational_events() -> None:
         app_version="1.2.3",
         environment="testing",
     )
-    app = create_app(settings=test_settings)
-    app_logger = logging.getLogger("app")
-    app_logger.addHandler(capture)
 
     try:
+        app = create_app(settings=test_settings)
+        app_logger.addHandler(capture)
+
         async with app.router.lifespan_context(app):
             pass
 
@@ -397,4 +413,6 @@ async def test_lifespan_startup_and_shutdown_operational_events() -> None:
         assert "Shutting down service" in shutdown["message"]
         assert "correlation_id" not in shutdown
     finally:
-        app_logger.removeHandler(capture)
+        app_logger.setLevel(prev_level)
+        app_logger.propagate = prev_propagate
+        app_logger.handlers = prev_handlers

@@ -148,3 +148,6 @@ class SQLiteUserRepository(UserRepositoryPort):
         cursor = self.conn.execute("SELECT COUNT(*) FROM users")
         row = cursor.fetchone()
         return int(row[0]) if row else 0
+
+
+__all__ = ["SQLiteUserRepository"]

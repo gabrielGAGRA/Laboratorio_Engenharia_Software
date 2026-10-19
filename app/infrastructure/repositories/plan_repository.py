@@ -81,3 +81,6 @@ class SQLitePlanRepository(PlanRepositoryPort):
         if new_id is not None:
             return self.find_by_id(new_id) or plan
         return plan
+
+
+__all__ = ["SQLitePlanRepository"]

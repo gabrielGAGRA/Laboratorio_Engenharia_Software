@@ -81,3 +81,6 @@ class SpotifyAdapter(TrackCatalogPort, PlaylistExportPort):
         """
         playlist_id = uuid.uuid5(uuid.NAMESPACE_DNS, f"{account_id}:{name}").hex[:22]
         return f"spotify:playlist:{playlist_id}"
+
+
+__all__ = ["SpotifyAdapter"]

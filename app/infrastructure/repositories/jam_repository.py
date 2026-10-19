@@ -204,3 +204,6 @@ class SQLiteJamRepository(JamRepositoryPort):
         if jam is None:
             raise EntityNotFoundError(entity_name="Jam", entity_id=jam_id)
         return jam
+
+
+__all__ = ["SQLiteJamRepository"]

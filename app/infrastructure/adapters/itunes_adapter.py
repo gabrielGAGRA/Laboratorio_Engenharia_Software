@@ -54,3 +54,6 @@ class ITunesAdapter(TrackPreviewPort):
                 service_name="iTunes",
                 details={"term": term},
             ) from exc
+
+
+__all__ = ["ITunesAdapter"]

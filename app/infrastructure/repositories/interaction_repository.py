@@ -91,3 +91,6 @@ class SQLiteInteractionRepository(InteractionRepositoryPort):
         )
         rows = cursor.fetchall()
         return [int(r["track_id"]) for r in rows]
+
+
+__all__ = ["SQLiteInteractionRepository"]

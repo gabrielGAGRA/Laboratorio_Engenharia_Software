@@ -4,9 +4,10 @@ import logging
 import time
 import uuid
 
-from fastapi import Request
-from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
+from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse, Response
+lazy from fastapi import Request
+lazy from starlette.middleware.base import RequestResponseEndpoint
 
 from app.infrastructure.telemetry.logging import (
     log_operational_event,
