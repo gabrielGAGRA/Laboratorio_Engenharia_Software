@@ -1,5 +1,5 @@
 ---
-name: PR-code-review 
+name: code-review 
 description: >- 
   Reviews pull requests following engineering practices.
 ---

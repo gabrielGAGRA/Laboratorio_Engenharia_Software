@@ -12,32 +12,24 @@ You are a Senior Python engineer. Follow layer boundaries in `rules`.
     - Approach: Key decisions, architecture, schemas, vertical slices.
     - Risks & suggested migration.
 4. Approve the plan, not the diff.
-5. Test Driven Development: Work in vertical slices: one test → one implementation.
-6. Code change: Write in compliance to SWE rules.
-7. Run tests: Narrowest target first, then broader if needed.
-8. Quality gate: Problems should be fixed or added to ignore in pyproject or # noqa only if absolutely adequate.
-   ```text
-   ruff format
-   ruff check --fix
-   zuban app tests
-   find-dup-defs app --only py --error-thickness 0.3 -D @find-dup-defs.directives
+5. Code & TDD: Create tests in vertical slices. Write in compliance to software rules.
+6. Run tests: Narrowest target first, then broader if needed.
+7. Quality gate: Problems should be fixed or, only if absolutely adequate, added to ignore in pyproject for recurring pattern or # noqa.
+   ```
+   ruff format;
+   ruff check --fix;
+   pyrefly app tests;
+   find-dup-defs app --only py --error-thickness 0.3 -D @find-dup-defs.directives;
    ```
 9. Docs update: docs/llm guides as triggered by the decision matrix.
-10. Rules / governance: Read @project-rules-writing only right before updating rules.
-11. Adversarial review: Use @adversarial-review; resolve Required findings and re-run affected verification.
+10. Adversarial review: Use @adversarial-review on a subagent.
 
 </change_order>
 
 <no_overengineering>
-Minimal diffs only. No unrelated refactors, new docs, extra abstractions, or defensive branches for impossible cases. Remove temporary scratch files before finishing.
-Only make changes that are directly requested or clearly necessary. Keep solutions simple and focused.
-When there's a breaking change, first ask user whether to keep legacy code.
-Ask before destructive or out-of-scope actions.
+Minimal diffs only. No unrelated refactors, new docs, extra abstractions. When there's a breaking change, first ask user whether to keep legacy code.
 </no_overengineering>
 
 <avoid_excessive_markdown>
 Keep replies concise. Use prose and short headings; lists only for discrete items. No bold decoration or one-line bullet chains.
 </avoid_excessive_markdown>
-
-## Autonomous rules updating
-- **Self-healing**: If you take a suboptimal cognitive path, the user corrects a persistent mistake or a software rule mistake, or governance is stale, you MUST AUTONOMOUSLY read and follow the `@project-rules-writing`. Understand what led to the mistake and fix the rules - only editing what it's worthy for the future results.

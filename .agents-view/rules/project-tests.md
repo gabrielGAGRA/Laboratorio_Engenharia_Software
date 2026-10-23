@@ -1,14 +1,14 @@
 ---
 trigger: model_decision
 description: Use when writing or editing view tests and running verification gates - test execution, typecheck, linting, and formatting.
-globs: src/**/*.{ts,html,spec.ts}
+globs: view/**/*.{ts,html,spec.ts}
 ---
 
 # View Verification & Tests
 
 ## 1. Quality Gates (Linting & Typecheck)
 
-Execute after changes in `src/`:
+Execute after changes in `view/`:
 
 ```bash
 # Typecheck com o compilador nativo do TypeScript 7
@@ -48,7 +48,7 @@ Unit tests are co-located with source files as `*.spec.ts`.
 
 | Directory / File | Scope |
 | --- | --- |
-| `src/**/*.spec.ts` | Angular unit tests (components, services, pipes, directives) |
+| `view/**/*.spec.ts` | Angular unit tests (components, services, pipes, directives) |
 
 ```bash
 # Run unit tests (headless for CI / local verification)
