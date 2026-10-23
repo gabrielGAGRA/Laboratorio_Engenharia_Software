@@ -2,9 +2,13 @@
 
 from dataclasses import dataclass
 
-from app.domain.exceptions import BusinessRuleViolationError, EntityNotFoundError
+from app.domain.exceptions import (
+    BusinessRuleViolationError,
+    DuplicateEntityError,
+    EntityNotFoundError,
+)
 from app.domain.models.review import ReviewComment
-lazy from app.application.commands.review_commands import PublishReviewCommand
+lazy from app.application.dtos.review_dtos import PublishReviewCommand
 lazy from app.application.ports.repositories.review_repository import (
     ReviewRepositoryPort,
 )
@@ -36,6 +40,15 @@ class PublishReviewUseCase:
                 f"Track with ID {command.track_id} not found or inactive."
             )
 
+        existing = self.review_repo.find_active_by_user_and_track(
+            command.user_id, command.track_id
+        )
+        if existing is not None:
+            raise DuplicateEntityError(
+                message="You have already reviewed this track.",
+                entity_name="ReviewComment",
+            )
+
         review = ReviewComment(
             review_id=None,
             user_id=command.user_id,
@@ -46,3 +59,6 @@ class PublishReviewUseCase:
             is_deleted=False,
         )
         return self.review_repo.save(review)
+
+
+__all__ = ["PublishReviewUseCase"]

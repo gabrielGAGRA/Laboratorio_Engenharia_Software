@@ -3,10 +3,13 @@
 from dataclasses import dataclass
 
 from app.domain.exceptions import AuthenticationRequiredError, PermissionDeniedError
-lazy from app.application.commands.auth_commands import AuthenticateAdminCommand
+lazy from app.application.dtos.auth_dtos import (
+    AuthenticateAdminCommand,
+    AuthResult,
+)
 lazy from app.application.ports.repositories.user_repository import UserRepositoryPort
 lazy from app.application.ports.services.password_hasher import PasswordHasherPort
-lazy from app.domain.models.user import User
+lazy from app.application.ports.services.token_service import TokenServicePort
 
 
 @dataclass(slots=True, frozen=True)
@@ -15,8 +18,9 @@ class AuthenticateAdminUseCase:
 
     user_repo: UserRepositoryPort
     password_hasher: PasswordHasherPort
+    token_service: TokenServicePort | None = None
 
-    def execute(self, command: AuthenticateAdminCommand) -> User:
+    def execute(self, command: AuthenticateAdminCommand) -> AuthResult:
         user = self.user_repo.find_by_email(command.email.strip().lower())
         if not user:
             raise AuthenticationRequiredError("Invalid credentials.")
@@ -29,4 +33,10 @@ class AuthenticateAdminUseCase:
         if not user.is_admin:
             raise PermissionDeniedError("Access restricted to administrators.")
 
-        return user
+        token = ""
+        if self.token_service is not None and user.user_id is not None:
+            token = self.token_service.create_access_token(
+                user_id=user.user_id, is_admin=True
+            )
+
+        return AuthResult(user=user, access_token=token)

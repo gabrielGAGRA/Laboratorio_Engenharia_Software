@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from app.application.commands.user_commands import UpdateProfileCommand
+from app.application.dtos.user_dtos import UpdateProfileCommand
 from app.application.use_cases.user.update_profile import UpdateProfileUseCase
 from app.domain.exceptions import AuthenticationRequiredError, EntityNotFoundError
 from app.domain.models import User

@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from app.application.commands.playlist_commands import AddTrackToPlaylistCommand
+from app.application.dtos.playlist_dtos import AddTrackToPlaylistCommand
 from app.application.ports.repositories.playlist_repository import (
     PlaylistRepositoryPort,
 )
@@ -274,3 +274,100 @@ def test_add_track_to_playlist_deleted_track_raises_entity_not_found() -> None:
         EntityNotFoundError, match="Track with ID 100 not found or inactive"
     ):
         use_case.execute(command)
+
+
+def test_add_track_to_playlist_duration_cap_exceeded_raises_business_rule_error() -> (
+    None
+):
+    user = User(
+        user_id=1,
+        email="owner@ribbit.com",
+        password_hash="pw",
+        display_name="Owner",
+        age=25,
+        plan_id=1,
+    )
+    t1 = Track(
+        track_id=10, title="Song 1", artist="Artist", duration_seconds=200, genre="Pop"
+    )
+    t2 = Track(
+        track_id=20, title="Song 2", artist="Artist", duration_seconds=150, genre="Pop"
+    )
+    # Playlist has max duration of 300 seconds; t1 is 200s, adding t2 (150s) exceeds 300s
+    playlist = Playlist(
+        playlist_id=5,
+        user_id=1,
+        name="Capped",
+        max_duration_seconds=300,
+        initial_tracks=[t1],
+    )
+
+    user_repo = MagicMock(spec=UserRepositoryPort)
+    user_repo.find_by_id.return_value = user
+
+    playlist_repo = MagicMock(spec=PlaylistRepositoryPort)
+    playlist_repo.find_by_id.return_value = playlist
+
+    track_repo = MagicMock(spec=TrackRepositoryPort)
+    track_repo.find_by_id.return_value = t2
+
+    use_case = AddTrackToPlaylistUseCase(
+        user_repo=user_repo,
+        track_repo=track_repo,
+        playlist_repo=playlist_repo,
+    )
+    command = AddTrackToPlaylistCommand(playlist_id=5, track_id=20, user_id=1)
+
+    with pytest.raises(BusinessRuleViolationError, match="maximum playlist duration"):
+        use_case.execute(command)
+
+
+def test_add_track_to_playlist_superlike_records_loved_interaction() -> None:
+    from app.application.ports.repositories.interaction_repository import (
+        InteractionRepositoryPort,
+    )
+    from app.domain.models import InteractionAction
+
+    user = User(
+        user_id=1,
+        email="owner@ribbit.com",
+        password_hash="pw",
+        display_name="Owner",
+        age=25,
+        plan_id=1,
+    )
+    t1 = Track(
+        track_id=10, title="Song 1", artist="Artist", duration_seconds=180, genre="Pop"
+    )
+    playlist = Playlist(playlist_id=5, user_id=1, name="My Playlist")
+
+    user_repo = MagicMock(spec=UserRepositoryPort)
+    user_repo.find_by_id.return_value = user
+
+    playlist_repo = MagicMock(spec=PlaylistRepositoryPort)
+    playlist_repo.find_by_id.return_value = playlist
+    playlist_repo.save.side_effect = lambda p: p
+
+    track_repo = MagicMock(spec=TrackRepositoryPort)
+    track_repo.find_by_id.return_value = t1
+
+    interaction_repo = MagicMock(spec=InteractionRepositoryPort)
+
+    use_case = AddTrackToPlaylistUseCase(
+        user_repo=user_repo,
+        track_repo=track_repo,
+        playlist_repo=playlist_repo,
+        interaction_repo=interaction_repo,
+    )
+    command = AddTrackToPlaylistCommand(
+        playlist_id=5, track_id=10, user_id=1, action="superlike"
+    )
+
+    res = use_case.execute(command)
+
+    assert len(res.tracks) == 1
+    interaction_repo.save.assert_called_once()
+    saved = interaction_repo.save.call_args[0][0]
+    assert saved.user_id == 1
+    assert saved.track_id == 10
+    assert saved.action == InteractionAction.SUPERLIKE

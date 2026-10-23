@@ -9,6 +9,7 @@ from app.application.ports.repositories.user_repository import UserRepositoryPor
 from app.application.use_cases.user.add_family_member import AddFamilyMemberUseCase
 from app.domain.exceptions import (
     BusinessRuleViolationError,
+    DuplicateEntityError,
     EntityNotFoundError,
     PermissionDeniedError,
 )
@@ -338,3 +339,125 @@ def test_add_family_member_links_account_and_updates_plan_successfully() -> None
     assert result.primary_account_id == 1
     assert result.plan_id == 3
     user_repo.save.assert_called_once_with(dependent_user)
+
+
+def test_add_family_member_provisioning_minor_succeeds() -> None:
+    primary_user = User(
+        user_id=1,
+        email="primary@test.com",
+        password_hash="hash",
+        display_name="Primary",
+        age=30,
+        plan_id=3,
+    )
+    family_plan = Plan(
+        plan_id=3,
+        name="Family",
+        initial_monthly_price=34.90,
+        initial_max_profiles=6,
+    )
+    user_repo = MagicMock(spec=UserRepositoryPort)
+    user_repo.find_by_id.return_value = primary_user
+    user_repo.find_by_email.return_value = None
+    user_repo.list_dependents.return_value = []
+    user_repo.save.side_effect = lambda u: u
+
+    plan_repo = MagicMock(spec=PlanRepositoryPort)
+    plan_repo.find_by_id.return_value = family_plan
+
+    use_case = AddFamilyMemberUseCase(user_repo=user_repo, plan_repo=plan_repo)
+    result = use_case.execute(
+        primary_user_id=1,
+        email="child@test.com",
+        password="secretpassword",
+        display_name="Child Profile",
+        birth_date="2014-06-10",
+    )
+
+    assert result.email == "child@test.com"
+    assert result.display_name == "Child Profile"
+    assert result.primary_account_id == 1
+    assert result.plan_id == 3
+    assert result.birth_date == "2014-06-10"
+    assert result.is_minor() is True
+    user_repo.save.assert_called_once()
+
+
+def test_add_family_member_provisioning_duplicate_email_raises_duplicate_entity() -> (
+    None
+):
+    primary_user = User(
+        user_id=1,
+        email="primary@test.com",
+        password_hash="hash",
+        display_name="Primary",
+        age=30,
+        plan_id=3,
+    )
+    existing_user = User(
+        user_id=5,
+        email="taken@test.com",
+        password_hash="hash",
+        display_name="Taken",
+        age=22,
+        plan_id=1,
+    )
+    family_plan = Plan(
+        plan_id=3,
+        name="Family",
+        initial_monthly_price=34.90,
+        initial_max_profiles=6,
+    )
+    user_repo = MagicMock(spec=UserRepositoryPort)
+    user_repo.find_by_id.return_value = primary_user
+    user_repo.find_by_email.return_value = existing_user
+    user_repo.list_dependents.return_value = []
+
+    plan_repo = MagicMock(spec=PlanRepositoryPort)
+    plan_repo.find_by_id.return_value = family_plan
+
+    use_case = AddFamilyMemberUseCase(user_repo=user_repo, plan_repo=plan_repo)
+
+    with pytest.raises(DuplicateEntityError, match="já está em uso"):
+        use_case.execute(
+            primary_user_id=1,
+            email="taken@test.com",
+            password="secretpassword",
+            display_name="Taken",
+            birth_date="2012-01-01",
+        )
+
+
+def test_add_family_member_provisioning_future_birth_date_raises_violation() -> None:
+    primary_user = User(
+        user_id=1,
+        email="primary@test.com",
+        password_hash="hash",
+        display_name="Primary",
+        age=30,
+        plan_id=3,
+    )
+    family_plan = Plan(
+        plan_id=3,
+        name="Family",
+        initial_monthly_price=34.90,
+        initial_max_profiles=6,
+    )
+    user_repo = MagicMock(spec=UserRepositoryPort)
+    user_repo.find_by_id.return_value = primary_user
+    user_repo.find_by_email.return_value = None
+    user_repo.list_dependents.return_value = []
+
+    plan_repo = MagicMock(spec=PlanRepositoryPort)
+    plan_repo.find_by_id.return_value = family_plan
+
+    use_case = AddFamilyMemberUseCase(user_repo=user_repo, plan_repo=plan_repo)
+
+    with pytest.raises(BusinessRuleViolationError, match="não pode estar no futuro"):
+        use_case.execute(
+            primary_user_id=1,
+            email="future@test.com",
+            password="secretpassword",
+            display_name="Future",
+            birth_date="2099-01-01",
+        )

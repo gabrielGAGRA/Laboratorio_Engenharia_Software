@@ -2,7 +2,7 @@
 
 from unittest.mock import MagicMock
 
-from app.application.commands import UpdateProfileCommand
+from app.application.dtos import UpdateProfileCommand
 from app.application.use_cases.user import (
     AddFamilyMemberUseCase,
     CancelSubscriptionPlanUseCase,
@@ -334,3 +334,82 @@ def test_remove_family_member_forwards_ids_and_returns_unlinked_user() -> None:
         primary_user_id=10,
         member_user_id=12,
     )
+
+
+def test_add_family_member_provisioning_flow_forwards_credentials() -> None:
+    mock_use_case = MagicMock(spec=AddFamilyMemberUseCase)
+    created_dep = User(
+        user_id=15,
+        email="kid@ribbit.com",
+        password_hash="hashed_pw",
+        display_name="Little Frog",
+        age=12,
+        plan_id=3,
+        primary_account_id=10,
+        birth_date="2014-05-10",
+    )
+    mock_use_case.execute.return_value = created_dep
+    req = AddFamilyMemberRequest(
+        email="kid@ribbit.com",
+        password="kidpassword",
+        display_name="Little Frog",
+        birth_date="2014-05-10",
+    )
+
+    res = add_family_member(req=req, use_case=mock_use_case, auth_user_id=10)
+
+    assert res.user_id == 15
+    assert res.email == "kid@ribbit.com"
+    assert res.primary_account_id == 10
+    mock_use_case.execute.assert_called_once_with(
+        primary_user_id=10,
+        email="kid@ribbit.com",
+        password="kidpassword",
+        display_name="Little Frog",
+        birth_date="2014-05-10",
+    )
+
+
+def test_get_profile_includes_recent_interactions() -> None:
+    mock_use_case = MagicMock(spec=GetUserProfileUseCase)
+    user = _sample_user(10, 2)
+    plan = _sample_plan(2)
+    interaction = Interaction(
+        interaction_id=1,
+        user_id=10,
+        track_id=5,
+        action=InteractionAction.LIKE,
+    )
+    mock_use_case.execute.return_value = {
+        "user": user,
+        "plan": plan,
+        "recent_interactions": [interaction],
+    }
+
+    res = get_profile(user_id=10, use_case=mock_use_case)
+
+    assert res.user.user_id == 10
+    assert len(res.recent_interactions) == 1
+    assert res.recent_interactions[0].track_id == 5
+    assert res.recent_interactions[0].action == "like"
+    assert len(res.interacoes_recentes) == 1
+
+
+def test_profile_router_has_portuguese_route_aliases() -> None:
+    from app.presentation.routers.profile import router
+
+    paths = [route.path for route in router.routes]  # type: ignore[attr-defined]
+    assert "/api/profile/me" in paths
+    assert "/api/perfil/me" in paths
+    assert "/api/plans" in paths
+    assert "/api/planos" in paths
+    assert "/api/profile/plan" in paths
+    assert "/api/perfil/plano" in paths
+    assert "/api/profile/account" in paths
+    assert "/api/perfil/conta" in paths
+    assert "/api/profile/blocked-genres" in paths
+    assert "/api/perfil/generos-bloqueados" in paths
+    assert "/api/profile/family/members" in paths
+    assert "/api/perfil/familia/membros" in paths
+    assert "/api/profile/family/members/{member_id}" in paths
+    assert "/api/perfil/familia/membros/{member_id}" in paths

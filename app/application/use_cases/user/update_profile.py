@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 
 from app.domain.exceptions import AuthenticationRequiredError, EntityNotFoundError
-lazy from app.application.commands.user_commands import UpdateProfileCommand
+lazy from app.application.dtos.user_dtos import UpdateProfileCommand
 lazy from app.application.ports.repositories.user_repository import UserRepositoryPort
 lazy from app.application.ports.services.password_hasher import PasswordHasherPort
 lazy from app.domain.models.user import User

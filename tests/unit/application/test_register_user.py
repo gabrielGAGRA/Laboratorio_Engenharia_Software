@@ -4,12 +4,16 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from app.application.commands.auth_commands import RegisterUserCommand
+from app.application.dtos.auth_dtos import RegisterUserCommand
 from app.application.ports.repositories.plan_repository import PlanRepositoryPort
 from app.application.ports.repositories.user_repository import UserRepositoryPort
 from app.application.ports.services.password_hasher import PasswordHasherPort
 from app.application.use_cases.auth.register_user import RegisterUserUseCase
-from app.domain.exceptions import DuplicateEntityError, EntityNotFoundError
+from app.domain.exceptions import (
+    BusinessRuleViolationError,
+    DuplicateEntityError,
+    EntityNotFoundError,
+)
 from app.domain.models.plan import Plan
 from app.domain.models.user import User
 
@@ -181,3 +185,111 @@ def test_register_user_explicit_plan_not_found_raises_entity_not_found() -> None
         use_case.execute(command)
 
     user_repo.save.assert_not_called()
+
+
+def test_register_user_with_adult_birth_date_succeeds() -> None:
+    user_repo = MagicMock(spec=UserRepositoryPort)
+    user_repo.find_by_email.return_value = None
+    user_repo.save.side_effect = lambda u: u
+
+    free_plan = Plan(
+        plan_id=1,
+        name=Plan.DEFAULT_FREE_PLAN_NAME,
+        initial_monthly_price=0.0,
+        initial_max_profiles=1,
+    )
+    plan_repo = MagicMock(spec=PlanRepositoryPort)
+    plan_repo.find_by_name.return_value = free_plan
+
+    password_hasher = MagicMock(spec=PasswordHasherPort)
+    password_hasher.hash_password.return_value = "hashed_pw"
+
+    use_case = RegisterUserUseCase(
+        user_repo=user_repo,
+        plan_repo=plan_repo,
+        password_hasher=password_hasher,
+    )
+    command = RegisterUserCommand(
+        email="adult@ribbit.com",
+        password="password123",
+        display_name="Adult Frog",
+        birth_date="1995-05-15",
+    )
+
+    result = use_case.execute(command)
+
+    assert result.email == "adult@ribbit.com"
+    assert result.birth_date == "1995-05-15"
+    assert result.age >= 18
+
+
+def test_register_user_underage_birth_date_raises_business_rule_violation() -> None:
+    user_repo = MagicMock(spec=UserRepositoryPort)
+    user_repo.find_by_email.return_value = None
+    plan_repo = MagicMock(spec=PlanRepositoryPort)
+    password_hasher = MagicMock(spec=PasswordHasherPort)
+
+    use_case = RegisterUserUseCase(
+        user_repo=user_repo,
+        plan_repo=plan_repo,
+        password_hasher=password_hasher,
+    )
+    command = RegisterUserCommand(
+        email="minor@ribbit.com",
+        password="password123",
+        display_name="Minor Frog",
+        birth_date="2015-01-01",
+    )
+
+    with pytest.raises(
+        BusinessRuleViolationError,
+        match="Cadastro direto permitido apenas para maiores de 18 anos",
+    ):
+        use_case.execute(command)
+
+
+def test_register_user_future_birth_date_raises_business_rule_violation() -> None:
+    user_repo = MagicMock(spec=UserRepositoryPort)
+    user_repo.find_by_email.return_value = None
+    plan_repo = MagicMock(spec=PlanRepositoryPort)
+    password_hasher = MagicMock(spec=PasswordHasherPort)
+
+    use_case = RegisterUserUseCase(
+        user_repo=user_repo,
+        plan_repo=plan_repo,
+        password_hasher=password_hasher,
+    )
+    command = RegisterUserCommand(
+        email="future@ribbit.com",
+        password="password123",
+        display_name="Future Frog",
+        birth_date="2099-01-01",
+    )
+
+    with pytest.raises(BusinessRuleViolationError, match="não pode estar no futuro"):
+        use_case.execute(command)
+
+
+def test_register_user_underage_age_without_birth_date_raises_violation() -> None:
+    user_repo = MagicMock(spec=UserRepositoryPort)
+    user_repo.find_by_email.return_value = None
+    plan_repo = MagicMock(spec=PlanRepositoryPort)
+    password_hasher = MagicMock(spec=PasswordHasherPort)
+
+    use_case = RegisterUserUseCase(
+        user_repo=user_repo,
+        plan_repo=plan_repo,
+        password_hasher=password_hasher,
+    )
+    command = RegisterUserCommand(
+        email="minor@ribbit.com",
+        password="password123",
+        display_name="Minor Frog",
+        age=16,
+    )
+
+    with pytest.raises(
+        BusinessRuleViolationError,
+        match="Cadastro direto permitido apenas para maiores de 18 anos",
+    ):
+        use_case.execute(command)

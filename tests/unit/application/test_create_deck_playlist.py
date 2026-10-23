@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from app.application.commands.playlist_commands import CreateDeckPlaylistCommand
+from app.application.dtos.playlist_dtos import CreateDeckPlaylistCommand
 from app.application.ports.repositories.playlist_repository import (
     PlaylistRepositoryPort,
 )

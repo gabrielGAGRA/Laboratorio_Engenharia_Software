@@ -17,7 +17,7 @@ from app.domain.exceptions import (
 
 type ErrorStatusMap = Mapping[type[CustomError], int]
 
-ERROR_STATUS_MAP: ErrorStatusMap = frozendict(  # type: ignore[name-defined]
+ERROR_STATUS_MAP: ErrorStatusMap = frozendict(
     {
         EntityNotFoundError: status.HTTP_404_NOT_FOUND,
         AuthenticationRequiredError: status.HTTP_401_UNAUTHORIZED,

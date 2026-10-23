@@ -151,3 +151,62 @@ def test_get_next_discovery_track_user_not_found_raises_entity_not_found() -> No
 
     with pytest.raises(EntityNotFoundError, match="User with ID 999 not found"):
         use_case.execute(user_id=999)
+
+
+def test_get_next_discovery_track_fetches_itunes_preview_fallback_when_missing() -> (
+    None
+):
+    from app.application.ports.services.music_service import (
+        TrackPreview,
+        TrackPreviewPort,
+    )
+
+    user = User(
+        user_id=1,
+        email="adult@ribbit.com",
+        password_hash="pw",
+        display_name="Adult Frog",
+        age=25,
+        plan_id=1,
+    )
+    track_without_preview = Track(
+        track_id=10,
+        title="Midnight Hop",
+        artist="DJ Toad",
+        duration_seconds=210,
+        genre="Electronic",
+        itunes_preview_url=None,
+    )
+
+    user_repo = MagicMock(spec=UserRepositoryPort)
+    user_repo.find_by_id.return_value = user
+
+    interaction_repo = MagicMock(spec=InteractionRepositoryPort)
+    interaction_repo.list_interacted_track_ids.return_value = []
+
+    track_repo = MagicMock(spec=TrackRepositoryPort)
+    track_repo.list_active.return_value = [track_without_preview]
+    track_repo.save.side_effect = lambda t: t
+
+    preview_service = MagicMock(spec=TrackPreviewPort)
+    preview_service.find_preview.return_value = TrackPreview(
+        external_id="ext-123",
+        title="Midnight Hop",
+        artist="DJ Toad",
+        preview_url="https://audio-ssl.itunes.apple.com/preview.m4a",
+        cover_url=None,
+    )
+
+    use_case = GetNextDiscoveryTrackUseCase(
+        user_repo=user_repo,
+        track_repo=track_repo,
+        interaction_repo=interaction_repo,
+        track_preview_port=preview_service,
+    )
+
+    result = use_case.execute(user_id=1)
+
+    assert result is not None
+    assert result.itunes_preview_url == "https://audio-ssl.itunes.apple.com/preview.m4a"
+    preview_service.find_preview.assert_called_once_with("DJ Toad Midnight Hop")
+    track_repo.save.assert_called_once_with(track_without_preview)

@@ -2,15 +2,18 @@
 
 from unittest.mock import MagicMock
 
-from app.application.commands import (
+from app.application.dtos import (
     AddTrackToPlaylistCommand,
     CreateDeckPlaylistCommand,
 )
 from app.application.use_cases.playlist import (
     AddTrackToPlaylistUseCase,
     CreateDeckPlaylistUseCase,
+    DeletePlaylistUseCase,
     ExportPlaylistToSpotifyUseCase,
+    GetPlaylistDeckUseCase,
     ListUserPlaylistsUseCase,
+    RemoveTrackFromPlaylistUseCase,
 )
 from app.domain.models import Playlist, Track
 from app.presentation.routers.playlists import (
@@ -135,4 +138,62 @@ def test_export_playlist_to_spotify_returns_updated_playlist() -> None:
     mock_use_case.execute.assert_called_once_with(
         user_id=3,
         playlist_id=11,
+    )
+
+
+def test_get_playlist_deck_endpoint() -> None:
+    from app.application.dtos.playlist_dtos import (
+        GetPlaylistDeckCommand,
+        PlaylistDeckResult,
+    )
+    from app.presentation.routers.playlists import get_playlist_deck
+
+    mock_use_case = MagicMock(spec=GetPlaylistDeckUseCase)
+    t = Track(
+        track_id=1, title="Song", artist="Artist", duration_seconds=180, genre="Pop"
+    )
+    mock_use_case.execute.return_value = PlaylistDeckResult(
+        items=[t], next_cursor=None, has_more=False
+    )
+
+    res = get_playlist_deck(
+        playlist_id=10, current_user_id=3, limit=10, use_case=mock_use_case
+    )
+
+    assert len(res.items) == 1
+    assert res.items[0].track_id == 1
+    mock_use_case.execute.assert_called_once_with(
+        GetPlaylistDeckCommand(playlist_id=10, user_id=3, limit=10, cursor_id=None)
+    )
+
+
+def test_remove_track_endpoint() -> None:
+    from app.application.dtos.playlist_dtos import RemoveTrackFromPlaylistCommand
+    from app.presentation.routers.playlists import remove_track
+
+    mock_use_case = MagicMock(spec=RemoveTrackFromPlaylistUseCase)
+    mock_use_case.execute.return_value = True
+
+    res = remove_track(
+        playlist_id=10, track_id=5, current_user_id=3, use_case=mock_use_case
+    )
+
+    assert res.success is True
+    mock_use_case.execute.assert_called_once_with(
+        RemoveTrackFromPlaylistCommand(playlist_id=10, track_id=5, user_id=3)
+    )
+
+
+def test_delete_playlist_endpoint() -> None:
+    from app.application.dtos.playlist_dtos import DeletePlaylistCommand
+    from app.presentation.routers.playlists import delete_playlist
+
+    mock_use_case = MagicMock(spec=DeletePlaylistUseCase)
+    mock_use_case.execute.return_value = True
+
+    res = delete_playlist(playlist_id=10, current_user_id=3, use_case=mock_use_case)
+
+    assert res.success is True
+    mock_use_case.execute.assert_called_once_with(
+        DeletePlaylistCommand(playlist_id=10, user_id=3)
     )

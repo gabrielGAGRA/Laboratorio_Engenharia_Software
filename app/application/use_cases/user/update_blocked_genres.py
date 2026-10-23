@@ -1,12 +1,20 @@
-"""Use case for updating blocked genres for Premium users."""
+"""Use case for updating blocked music genres for a user."""
 
 from dataclasses import dataclass
 lazy from collections.abc import Sequence
 
-from app.domain.exceptions import EntityNotFoundError, PermissionDeniedError
+from app.domain.exceptions import (
+    BusinessRuleViolationError,
+    EntityNotFoundError,
+    PermissionDeniedError,
+)
 lazy from app.application.ports.repositories.plan_repository import PlanRepositoryPort
 lazy from app.application.ports.repositories.user_repository import UserRepositoryPort
 lazy from app.domain.models.user import User
+
+
+class PremiumRequiredError(BusinessRuleViolationError, PermissionDeniedError):
+    """Raised when an operation requires a paid subscription plan."""
 
 
 @dataclass(slots=True, frozen=True)
@@ -23,7 +31,7 @@ class UpdateBlockedGenresUseCase:
 
         plan = self.plan_repo.find_by_id(user.plan_id)
         if not plan or not plan.is_paid:
-            raise PermissionDeniedError("Feature exclusive to Premium subscribers.")
+            raise PremiumRequiredError("Feature exclusive to Premium subscribers.")
 
         user.update_blocked_genres(blocked_genres)
         return self.user_repo.save(user)

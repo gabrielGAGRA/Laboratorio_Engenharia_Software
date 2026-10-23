@@ -2,7 +2,7 @@
 
 from unittest.mock import MagicMock
 
-from app.application.commands import (
+from app.application.dtos import (
     CreateJamCommand,
     VoteJamTrackCommand,
     VoteSkipJamTrackCommand,
@@ -184,4 +184,75 @@ def test_advance_jam_playback_forwards_ids_and_returns_jam_response() -> None:
     mock_use_case.execute.assert_called_once_with(
         jam_id=3,
         requester_user_id=10,
+    )
+
+
+def test_get_jam_deck_endpoint() -> None:
+    from app.application.dtos.jam_dtos import GetJamDeckCommand
+    from app.application.dtos.playlist_dtos import PlaylistDeckResult
+    from app.application.use_cases.jam import GetJamDeckUseCase
+    from app.presentation.routers.jams import get_jam_deck
+
+    mock_use_case = MagicMock(spec=GetJamDeckUseCase)
+    t = Track(
+        track_id=10,
+        title="Jam Track",
+        artist="Artist",
+        duration_seconds=180,
+        genre="Rock",
+    )
+    mock_use_case.execute.return_value = PlaylistDeckResult(
+        items=[t], next_cursor=None, has_more=False
+    )
+
+    res = get_jam_deck(jam_id=3, current_user_id=10, limit=10, use_case=mock_use_case)
+
+    assert len(res.items) == 1
+    assert res.items[0].track_id == 10
+    mock_use_case.execute.assert_called_once_with(
+        GetJamDeckCommand(jam_id=3, user_id=10, limit=10, cursor_id=None)
+    )
+
+
+def test_save_queue_track_endpoint() -> None:
+    from app.application.dtos.jam_dtos import SaveQueueTrackCommand
+    from app.application.use_cases.jam import SaveQueueTrackUseCase
+    from app.presentation.routers.jams import save_queue_track
+    from app.presentation.schemas.jams import SaveQueueTrackRequest
+
+    mock_use_case = MagicMock(spec=SaveQueueTrackUseCase)
+    mock_use_case.execute.return_value = True
+
+    req = SaveQueueTrackRequest(track_id=50, playlist_id=20)
+    res = save_queue_track(
+        jam_id=3, req=req, current_user_id=10, use_case=mock_use_case
+    )
+
+    assert res.success is True
+    mock_use_case.execute.assert_called_once_with(
+        SaveQueueTrackCommand(jam_id=3, user_id=10, track_id=50, playlist_id=20)
+    )
+
+
+def test_close_jam_endpoint() -> None:
+    from app.application.dtos.jam_dtos import CloseJamCommand
+    from app.application.use_cases.jam import CloseJamUseCase
+    from app.presentation.routers.jams import close_jam
+
+    mock_use_case = MagicMock(spec=CloseJamUseCase)
+    closed_jam = Jam(
+        jam_id=3,
+        host_user_id=10,
+        room_name="Closed",
+        room_code="123456",
+        is_active=False,
+    )
+    mock_use_case.execute.return_value = closed_jam
+
+    res = close_jam(jam_id=3, current_user_id=10, use_case=mock_use_case)
+
+    assert res.jam_id == 3
+    assert res.is_active is False
+    mock_use_case.execute.assert_called_once_with(
+        CloseJamCommand(jam_id=3, host_user_id=10)
     )

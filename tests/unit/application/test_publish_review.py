@@ -4,12 +4,17 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from app.application.commands.review_commands import PublishReviewCommand
+from app.application.dtos.review_dtos import PublishReviewCommand
 from app.application.ports.repositories.review_repository import ReviewRepositoryPort
 from app.application.ports.repositories.track_repository import TrackRepositoryPort
 from app.application.ports.repositories.user_repository import UserRepositoryPort
 from app.application.use_cases.review.publish_review import PublishReviewUseCase
-from app.domain.exceptions import BusinessRuleViolationError, EntityNotFoundError
+from app.domain.exceptions import (
+    BusinessRuleViolationError,
+    DuplicateEntityError,
+    EntityNotFoundError,
+)
+from app.domain.models.review import ReviewComment
 from app.domain.models.track import Track
 from app.domain.models.user import User
 
@@ -37,8 +42,12 @@ def test_publish_review_success_strips_text_and_saves_review() -> None:
     track_repo = MagicMock(spec=TrackRepositoryPort)
     track_repo.find_by_id.return_value = track
 
+    def _save_review(r: ReviewComment) -> ReviewComment:
+        return r
+
     review_repo = MagicMock(spec=ReviewRepositoryPort)
-    review_repo.save.side_effect = lambda r: r
+    review_repo.find_active_by_user_and_track.return_value = None
+    review_repo.save.side_effect = _save_review
 
     use_case = PublishReviewUseCase(
         user_repo=user_repo,
@@ -61,6 +70,57 @@ def test_publish_review_success_strips_text_and_saves_review() -> None:
     assert result.likes_count == 0
     assert result.is_deleted is False
     review_repo.save.assert_called_once_with(result)
+
+
+def test_publish_review_duplicate_active_review_raises_duplicate_entity_error() -> None:
+    user = User(
+        user_id=1,
+        email="critic@ribbit.com",
+        password_hash="pw",
+        display_name="Critic Frog",
+        age=28,
+        plan_id=1,
+    )
+    track = Track(
+        track_id=10,
+        title="Lily Pad Waltz",
+        artist="Frog Orchestra",
+        duration_seconds=200,
+        genre="Jazz",
+    )
+    existing_review = ReviewComment(
+        review_id=100,
+        user_id=1,
+        track_id=10,
+        initial_rating=4,
+        text="Earlier review",
+    )
+
+    user_repo = MagicMock(spec=UserRepositoryPort)
+    user_repo.find_by_id.return_value = user
+
+    track_repo = MagicMock(spec=TrackRepositoryPort)
+    track_repo.find_by_id.return_value = track
+
+    review_repo = MagicMock(spec=ReviewRepositoryPort)
+    review_repo.find_active_by_user_and_track.return_value = existing_review
+
+    use_case = PublishReviewUseCase(
+        user_repo=user_repo,
+        track_repo=track_repo,
+        review_repo=review_repo,
+    )
+    command = PublishReviewCommand(
+        user_id=1,
+        track_id=10,
+        rating=5,
+        text="Another review",
+    )
+
+    with pytest.raises(DuplicateEntityError, match="already reviewed"):
+        use_case.execute(command)
+
+    review_repo.save.assert_not_called()
 
 
 @pytest.mark.parametrize("invalid_rating", [0, 6, -1])

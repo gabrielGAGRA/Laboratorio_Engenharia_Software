@@ -2,7 +2,9 @@
 
 from unittest.mock import MagicMock
 
-from app.application.commands import (
+from fastapi import Request
+
+from app.application.dtos import (
     AuthenticateAdminCommand,
     UpdateSubscriptionPlanCommand,
 )
@@ -11,29 +13,38 @@ from app.application.use_cases.admin import (
     GetAudienceReportUseCase,
     GetExecutiveDashboardUseCase,
     GetTopModerationReviewsUseCase,
+    ListAdministratorsUseCase,
+    ListBlockedTracksUseCase,
     ListUsersWithPlansUseCase,
     PromoteUserToAdminUseCase,
+    UpdateAdminRoleUseCase,
     UpdateSubscriptionPlanUseCase,
     UpdateTrackExplicitFlagUseCase,
 )
 from app.application.use_cases.auth import AuthenticateAdminUseCase
-from app.domain.models import Plan, ReviewComment, User
+from app.domain.models import Plan, ReviewComment, Track, User
 from app.presentation.routers.admin import (
     block_track,
     get_audience_report,
     get_executive_dashboard,
     get_top_moderation_reviews,
+    list_administrators,
+    list_blocked_tracks,
+    list_plans,
     list_users,
     login_admin,
     promote_user_to_admin,
+    update_admin_role,
     update_plan,
     update_track_explicit,
 )
-from app.presentation.schemas import (
-    LoginRequest,
+from app.presentation.schemas.admin import (
+    BlockTrackRequest,
+    UpdateAdminRoleRequest,
     UpdatePlanAdminRequest,
     UpdateTrackExplicitRequest,
 )
+from app.presentation.schemas.auth import LoginRequest
 
 
 def test_login_admin_forwards_command_and_returns_admin_user() -> None:
@@ -118,6 +129,70 @@ def test_get_audience_report_returns_counts() -> None:
     mock_use_case.execute.assert_called_once_with()
 
 
+def test_list_administrators_router_returns_users() -> None:
+    mock_use_case = MagicMock(spec=ListAdministratorsUseCase)
+    admin = User(
+        user_id=1,
+        email="admin@ribbit.com",
+        password_hash="pw",
+        display_name="Admin",
+        age=32,
+        plan_id=1,
+        is_admin=True,
+    )
+    mock_use_case.execute.return_value = [admin]
+
+    res = list_administrators(use_case=mock_use_case)
+
+    assert len(res) == 1
+    assert res[0].user_id == 1
+    assert res[0].is_admin is True
+    mock_use_case.execute.assert_called_once_with()
+
+
+def test_update_admin_role_router_updates_role() -> None:
+    mock_use_case = MagicMock(spec=UpdateAdminRoleUseCase)
+    target = User(
+        user_id=2,
+        email="mod@ribbit.com",
+        password_hash="pw",
+        display_name="Mod",
+        age=25,
+        plan_id=1,
+        is_admin=True,
+    )
+    mock_use_case.execute.return_value = target
+    req = UpdateAdminRoleRequest(is_admin=True)
+
+    res = update_admin_role(user_id=2, req=req, admin_id=1, use_case=mock_use_case)
+
+    assert res.user_id == 2
+    assert res.is_admin is True
+    mock_use_case.execute.assert_called_once_with(
+        admin_id=1, target_user_id=2, is_admin=True
+    )
+
+
+def test_list_blocked_tracks_router_returns_tracks() -> None:
+    mock_use_case = MagicMock(spec=ListBlockedTracksUseCase)
+    track = Track(
+        track_id=88,
+        title="Blocked Track",
+        artist="Artist",
+        duration_seconds=180,
+        genre="Metal",
+        is_deleted=True,
+    )
+    mock_use_case.execute.return_value = [track]
+
+    res = list_blocked_tracks(use_case=mock_use_case)
+
+    assert len(res) == 1
+    assert res[0].track_id == 88
+    assert res[0].is_deleted is True
+    mock_use_case.execute.assert_called_once_with()
+
+
 def test_block_track_forwards_track_id_and_returns_blocked_status() -> None:
     mock_use_case = MagicMock(spec=BlockTrackUseCase)
     mock_use_case.execute.return_value = True
@@ -126,6 +201,34 @@ def test_block_track_forwards_track_id_and_returns_blocked_status() -> None:
 
     assert res.blocked is True
     mock_use_case.execute.assert_called_once_with(track_id=77)
+
+
+def test_block_track_with_request_body_unblocks_track() -> None:
+    mock_use_case = MagicMock(spec=BlockTrackUseCase)
+    mock_use_case.execute.return_value = False
+    req = BlockTrackRequest(blocked=False)
+
+    res = block_track(track_id=77, req=req, use_case=mock_use_case)
+
+    assert res.blocked is False
+    mock_use_case.execute.assert_called_once_with(track_id=77, blocked=False)
+
+
+def test_list_plans_router_returns_plans_from_container() -> None:
+    mock_plan = Plan(
+        plan_id=1,
+        name="Free",
+        initial_monthly_price=0.0,
+        initial_max_profiles=1,
+    )
+    mock_request = MagicMock(spec=Request)
+    mock_request.app.state.container.plan_repo.list_all.return_value = [mock_plan]
+
+    res = list_plans(request=mock_request)
+
+    assert len(res) == 1
+    assert res[0].plan_id == 1
+    assert res[0].name == "Free"
 
 
 def test_update_track_explicit_forwards_flag_and_returns_response() -> None:

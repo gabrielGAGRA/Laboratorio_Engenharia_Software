@@ -8,15 +8,22 @@ lazy from app.application.ports.repositories.track_repository import TrackReposi
 
 @dataclass(slots=True, frozen=True)
 class BlockTrackUseCase:
-    """Applies soft-delete to an offensive or deactivated music track."""
+    """Applies or removes soft-delete on a music track."""
 
     track_repo: TrackRepositoryPort
 
-    def execute(self, track_id: int) -> bool:
+    def execute(self, track_id: int, blocked: bool = True) -> bool:
         track = self.track_repo.find_by_id(track_id)
         if not track:
             raise EntityNotFoundError(f"Track {track_id} not found.")
 
-        track.mark_as_deleted()
+        if blocked:
+            track.mark_as_deleted()
+        else:
+            track.restore()
+
         self.track_repo.save(track)
-        return True
+        return track.is_deleted
+
+
+__all__ = ["BlockTrackUseCase"]

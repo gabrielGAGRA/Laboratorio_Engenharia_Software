@@ -1,9 +1,14 @@
 """Use case for registering a new platform user."""
 
 from dataclasses import dataclass
+from datetime import UTC, date, datetime
 
-from app.domain.exceptions import DuplicateEntityError, EntityNotFoundError
-lazy from app.application.commands.auth_commands import RegisterUserCommand
+from app.domain.exceptions import (
+    BusinessRuleViolationError,
+    DuplicateEntityError,
+    EntityNotFoundError,
+)
+lazy from app.application.dtos.auth_dtos import RegisterUserCommand
 lazy from app.application.ports.repositories.plan_repository import PlanRepositoryPort
 lazy from app.application.ports.repositories.user_repository import UserRepositoryPort
 lazy from app.application.ports.services.password_hasher import PasswordHasherPort
@@ -20,9 +25,41 @@ class RegisterUserUseCase:
     password_hasher: PasswordHasherPort
 
     def execute(self, command: RegisterUserCommand) -> User:
-        existing = self.user_repo.find_by_email(command.email)
+        email = command.email.strip().lower()
+        existing = self.user_repo.find_by_email(email)
         if existing:
-            raise DuplicateEntityError(f"Email {command.email} is already in use.")
+            raise DuplicateEntityError(f"Email {email} is already in use.")
+
+        age = command.age
+        birth_date_str = command.birth_date.strip() if command.birth_date else None
+
+        if birth_date_str:
+            try:
+                bdate = date.fromisoformat(birth_date_str)
+            except (ValueError, TypeError) as exc:
+                raise BusinessRuleViolationError(
+                    "Data de nascimento inválida."
+                ) from exc
+
+            today = datetime.now(tz=UTC).date()
+            if bdate > today:
+                raise BusinessRuleViolationError(
+                    "Data de nascimento não pode estar no futuro."
+                )
+
+            age = (
+                today.year
+                - bdate.year
+                - ((today.month, today.day) < (bdate.month, bdate.day))
+            )
+
+        if age is None or age < 0:
+            raise BusinessRuleViolationError("Data de nascimento inválida.")
+
+        if User.is_age_minor(age):
+            raise BusinessRuleViolationError(
+                "Cadastro direto permitido apenas para maiores de 18 anos."
+            )
 
         plan_id = command.plan_id
         if plan_id is None:
@@ -38,11 +75,12 @@ class RegisterUserUseCase:
         hashed_password = self.password_hasher.hash_password(command.password)
         new_user = User(
             user_id=None,
-            email=command.email.strip().lower(),
+            email=email,
             password_hash=hashed_password,
             display_name=command.display_name.strip(),
-            age=command.age,
+            age=age,
             plan_id=plan_id,
             is_admin=False,
+            birth_date=birth_date_str,
         )
         return self.user_repo.save(new_user)

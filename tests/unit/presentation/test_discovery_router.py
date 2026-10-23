@@ -2,7 +2,7 @@
 
 from unittest.mock import MagicMock
 
-from app.application.commands import RecordSwipeCommand
+from app.application.dtos import RecordSwipeCommand
 from app.application.use_cases.discovery import (
     GetNextDiscoveryTrackUseCase,
     RecordSwipeInteractionUseCase,
@@ -68,3 +68,36 @@ def test_record_interaction_converts_action_and_returns_response() -> None:
             action=InteractionAction.SUPERLIKE,
         )
     )
+
+
+def test_record_interaction_prefers_auth_user_id_when_provided() -> None:
+    mock_use_case = MagicMock(spec=RecordSwipeInteractionUseCase)
+    interaction = Interaction(
+        interaction_id=45,
+        user_id=99,
+        track_id=15,
+        action=InteractionAction.LIKE,
+    )
+    mock_use_case.execute.return_value = interaction
+    req = InteractionRequest(user_id=9, track_id=15, action="like")
+
+    res = record_interaction(req=req, use_case=mock_use_case, auth_user_id=99)
+
+    assert res.user_id == 99
+    mock_use_case.execute.assert_called_once_with(
+        RecordSwipeCommand(
+            user_id=99,
+            track_id=15,
+            action=InteractionAction.LIKE,
+        )
+    )
+
+
+def test_discovery_router_has_proxima_and_interagir_routes() -> None:
+    from app.presentation.routers.discovery import router
+
+    paths = [route.path for route in router.routes]  # type: ignore[attr-defined]
+    assert "/api/discovery/next" in paths
+    assert "/api/discovery/proxima" in paths
+    assert "/api/discovery/interact" in paths
+    assert "/api/discovery/interagir" in paths

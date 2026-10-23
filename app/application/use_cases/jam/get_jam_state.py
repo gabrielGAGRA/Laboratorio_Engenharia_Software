@@ -12,7 +12,7 @@ lazy from app.domain.models.jam import JamQueueItem
 
 @dataclass(slots=True, frozen=True)
 class GetJamStateUseCase:
-    """Returns room state, currently playing track, and ordered queue."""
+    """Returns room state, currently playing track, skip votes count, and ordered queue."""
 
     jam_repo: JamRepositoryPort
     user_repo: UserRepositoryPort
@@ -45,7 +45,7 @@ class GetJamStateUseCase:
             track = tracks_by_id.get(item.track_id)
             if not track or track.is_deleted:
                 continue
-            if not user.is_adult and track.explicit:
+            if not user.can_listen(track):
                 continue
             queue_items.append(item)
 
@@ -53,12 +53,17 @@ class GetJamStateUseCase:
         if (
             current_track_domain
             and not current_track_domain.is_deleted
-            and (user.is_adult or not current_track_domain.explicit)
+            and user.can_listen(current_track_domain)
         ):
             current_track = current_track_domain
+
+        skip_votes = 0
+        if jam.current_track_id and hasattr(self.jam_repo, "count_skip_votes"):
+            skip_votes = self.jam_repo.count_skip_votes(jam_id, jam.current_track_id)
 
         return JamStateResult(
             jam=jam,
             current_track=current_track,
             queue=queue_items,
+            skip_votes=skip_votes,
         )

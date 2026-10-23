@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from app.application.commands.jam_commands import VoteSkipJamTrackCommand
+from app.application.dtos.jam_dtos import VoteSkipJamTrackCommand
 from app.application.ports.repositories.jam_repository import JamRepositoryPort
 from app.application.ports.repositories.track_repository import TrackRepositoryPort
 from app.application.ports.repositories.user_repository import UserRepositoryPort

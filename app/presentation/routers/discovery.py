@@ -2,32 +2,40 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends
 
-from app.application.commands import RecordSwipeCommand
+from app.application.dtos import RecordSwipeCommand
 from app.application.use_cases.discovery import (
     GetNextDiscoveryTrackUseCase,
     RecordSwipeInteractionUseCase,
 )
+from app.domain.exceptions import AuthenticationRequiredError
 from app.domain.models.interaction import InteractionAction
-from app.presentation.dependencies import (
-    get_next_discovery_track_use_case,
-    get_record_swipe_interaction_use_case,
-)
+from app.presentation.dependencies import provide, require_user
 from app.presentation.schemas import (
     InteractionRequest,
     InteractionResponse,
     TrackResponse,
 )
 
-router = APIRouter(prefix="/api/discovery", tags=["Discovery"])
+router = APIRouter(tags=["Discovery"])
 
 
-@router.get("/next", response_model=TrackResponse | None)
+@router.get("/api/discovery/next", response_model=TrackResponse | None)
+@router.get(
+    "/api/discovery/proxima",
+    response_model=TrackResponse | None,
+    include_in_schema=False,
+)
+@router.get(
+    "/api/descoberta/proxima",
+    response_model=TrackResponse | None,
+    include_in_schema=False,
+)
 def get_next_track(
-    user_id: Annotated[int, Query()],
+    user_id: Annotated[int, Depends(require_user)],
     use_case: Annotated[
-        GetNextDiscoveryTrackUseCase, Depends(get_next_discovery_track_use_case)
+        GetNextDiscoveryTrackUseCase, Depends(provide(GetNextDiscoveryTrackUseCase))
     ],
 ) -> TrackResponse | None:
     track = use_case.execute(user_id=user_id)
@@ -36,18 +44,37 @@ def get_next_track(
     return TrackResponse.model_validate(track)
 
 
-@router.post("/interact", response_model=InteractionResponse)
+@router.post("/api/discovery/interact", response_model=InteractionResponse)
+@router.post("/api/discovery/interactions", response_model=InteractionResponse)
+@router.post(
+    "/api/discovery/interagir",
+    response_model=InteractionResponse,
+    include_in_schema=False,
+)
+@router.post(
+    "/api/descoberta/interagir",
+    response_model=InteractionResponse,
+    include_in_schema=False,
+)
 def record_interaction(
     req: InteractionRequest,
     use_case: Annotated[
         RecordSwipeInteractionUseCase,
-        Depends(get_record_swipe_interaction_use_case),
+        Depends(provide(RecordSwipeInteractionUseCase)),
     ],
+    auth_user_id: Annotated[int, Depends(require_user)] = 0,
 ) -> InteractionResponse:
-    action = InteractionAction(req.action.lower())
+    uid = auth_user_id or req.user_id
+    if not uid:
+        raise AuthenticationRequiredError("Authentication required.")
+    action = (
+        InteractionAction(req.action.lower())
+        if isinstance(req.action, str)
+        else req.action
+    )
     interaction = use_case.execute(
         RecordSwipeCommand(
-            user_id=req.user_id,
+            user_id=uid,
             track_id=req.track_id,
             action=action,
         )

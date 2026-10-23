@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from app.application.commands.auth_commands import AuthenticateAdminCommand
+from app.application.dtos.auth_dtos import AuthenticateAdminCommand
 from app.application.ports.repositories.user_repository import UserRepositoryPort
 from app.application.ports.services.password_hasher import PasswordHasherPort
 from app.application.use_cases.auth.authenticate_admin import AuthenticateAdminUseCase
@@ -39,12 +39,51 @@ def test_authenticate_admin_success_returns_admin_user() -> None:
 
     result = use_case.execute(command)
 
-    assert result is admin_user
+    assert result.user is admin_user
+    assert result.is_admin is True
     user_repo.find_by_email.assert_called_once_with("admin@ribbit.com")
     password_hasher.verify_password.assert_called_once_with(
         "plain_password",
         "hashed_secret",
     )
+
+
+def test_authenticate_admin_with_token_service_generates_bearer_token() -> None:
+    from app.application.ports.services.token_service import TokenServicePort
+
+    admin_user = User(
+        user_id=1,
+        email="admin@ribbit.com",
+        password_hash="hashed_secret",
+        display_name="Admin Frog",
+        age=30,
+        plan_id=1,
+        is_admin=True,
+    )
+    user_repo = MagicMock(spec=UserRepositoryPort)
+    user_repo.find_by_email.return_value = admin_user
+
+    password_hasher = MagicMock(spec=PasswordHasherPort)
+    password_hasher.verify_password.return_value = True
+
+    token_service = MagicMock(spec=TokenServicePort)
+    token_service.create_access_token.return_value = "admin_bearer_jwt_token"
+
+    use_case = AuthenticateAdminUseCase(
+        user_repo=user_repo,
+        password_hasher=password_hasher,
+        token_service=token_service,
+    )
+    command = AuthenticateAdminCommand(
+        email="admin@ribbit.com",
+        password="plain_password",
+    )
+
+    result = use_case.execute(command)
+
+    assert result.user is admin_user
+    assert result.access_token == "admin_bearer_jwt_token"
+    token_service.create_access_token.assert_called_once_with(user_id=1, is_admin=True)
 
 
 def test_authenticate_admin_user_not_found_raises_authentication_required() -> None:

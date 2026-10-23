@@ -11,6 +11,7 @@ from app.presentation.schemas.admin import (
     UserPlanSummaryResponse,
 )
 from app.presentation.schemas.auth import (
+    AuthResponse,
     LoginRequest,
     RegisterUserRequest,
     UserResponse,
@@ -56,6 +57,7 @@ __all__ = [
     "AddFamilyMemberRequest",
     "AnnualStatsResponse",
     "AudienceReportResponse",
+    "AuthResponse",
     "BlockedGenresRequest",
     "ChangeInteractionRequest",
     "ChangePlanRequest",

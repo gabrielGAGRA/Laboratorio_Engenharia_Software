@@ -4,7 +4,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
 
-from app.application.commands import UpdateProfileCommand
+from app.application.dtos import UpdateProfileCommand
 from app.application.use_cases.user import (
     AddFamilyMemberUseCase,
     CancelSubscriptionPlanUseCase,
@@ -23,24 +23,7 @@ from app.application.use_cases.user import (
     UpdateProfileUseCase,
 )
 from app.domain.models.interaction import InteractionAction
-from app.presentation.dependencies import (
-    get_add_family_member_use_case,
-    get_annual_stats_use_case,
-    get_cancel_subscription_plan_use_case,
-    get_change_subscription_plan_use_case,
-    get_change_track_interaction_use_case,
-    get_delete_user_account_use_case,
-    get_link_spotify_account_use_case,
-    get_list_blocked_genres_use_case,
-    get_list_family_members_use_case,
-    get_list_plans_use_case,
-    get_list_user_interactions_use_case,
-    get_remove_family_member_use_case,
-    get_update_blocked_genres_use_case,
-    get_update_profile_use_case,
-    get_user_profile_use_case,
-    require_user,
-)
+from app.presentation.dependencies import provide, require_user
 from app.presentation.schemas import (
     ActionSuccessResponse,
     AddFamilyMemberRequest,
@@ -60,19 +43,23 @@ router = APIRouter(tags=["Profile & Plans"])
 
 
 @router.get("/api/profile/me", response_model=UserProfileResponse)
+@router.get(
+    "/api/perfil/me", response_model=UserProfileResponse, include_in_schema=False
+)
 def get_profile(
     user_id: Annotated[int, Depends(require_user)],
-    use_case: Annotated[GetUserProfileUseCase, Depends(get_user_profile_use_case)],
+    use_case: Annotated[GetUserProfileUseCase, Depends(provide(GetUserProfileUseCase))],
 ) -> UserProfileResponse:
     data = use_case.execute(user_id=user_id)
     return UserProfileResponse.model_validate(data)
 
 
 @router.put("/api/profile/me", response_model=UserResponse)
+@router.put("/api/perfil/me", response_model=UserResponse, include_in_schema=False)
 def update_profile(
     req: UpdateProfileRequest,
     user_id: Annotated[int, Depends(require_user)],
-    use_case: Annotated[UpdateProfileUseCase, Depends(get_update_profile_use_case)],
+    use_case: Annotated[UpdateProfileUseCase, Depends(provide(UpdateProfileUseCase))],
 ) -> UserResponse:
     user = use_case.execute(
         UpdateProfileCommand(
@@ -89,7 +76,7 @@ def update_profile(
 def link_spotify(
     req: LinkSpotifyRequest,
     use_case: Annotated[
-        LinkSpotifyAccountUseCase, Depends(get_link_spotify_account_use_case)
+        LinkSpotifyAccountUseCase, Depends(provide(LinkSpotifyAccountUseCase))
     ],
 ) -> UserResponse:
     user = use_case.execute(
@@ -100,34 +87,59 @@ def link_spotify(
 
 
 @router.get("/api/plans", response_model=list[PlanResponse])
+@router.get("/api/planos", response_model=list[PlanResponse], include_in_schema=False)
+@router.get(
+    "/api/profile/plans",
+    response_model=list[PlanResponse],
+    include_in_schema=False,
+)
+@router.get(
+    "/api/perfil/planos",
+    response_model=list[PlanResponse],
+    include_in_schema=False,
+)
 def list_plans(
-    use_case: Annotated[ListPlansUseCase, Depends(get_list_plans_use_case)],
+    use_case: Annotated[ListPlansUseCase, Depends(provide(ListPlansUseCase))],
 ) -> list[PlanResponse]:
     plans = use_case.execute()
     return [PlanResponse.model_validate(p) for p in plans]
 
 
 @router.post("/api/profile/plan", response_model=UserResponse)
+@router.post("/api/perfil/plano", response_model=UserResponse, include_in_schema=False)
+@router.put("/api/profile/plan", response_model=UserResponse)
+@router.put("/api/perfil/plano", response_model=UserResponse, include_in_schema=False)
 def change_plan(
     req: ChangePlanRequest,
     use_case: Annotated[
         ChangeSubscriptionPlanUseCase,
-        Depends(get_change_subscription_plan_use_case),
+        Depends(provide(ChangeSubscriptionPlanUseCase)),
     ],
+    auth_user_id: Annotated[int, Depends(require_user)] = 0,
 ) -> UserResponse:
+    uid = req.user_id or auth_user_id
     user = use_case.execute(
-        user_id=req.user_id,
+        user_id=uid,
         new_plan_id=req.new_plan_id,
     )
     return UserResponse.model_validate(user)
 
 
 @router.delete("/api/profile/plan", response_model=UserResponse)
+@router.delete(
+    "/api/perfil/plano", response_model=UserResponse, include_in_schema=False
+)
+@router.post("/api/profile/plan/cancel", response_model=UserResponse)
+@router.post(
+    "/api/perfil/plano/cancelar",
+    response_model=UserResponse,
+    include_in_schema=False,
+)
 def cancel_plan(
     user_id: Annotated[int, Depends(require_user)],
     use_case: Annotated[
         CancelSubscriptionPlanUseCase,
-        Depends(get_cancel_subscription_plan_use_case),
+        Depends(provide(CancelSubscriptionPlanUseCase)),
     ],
 ) -> UserResponse:
     user = use_case.execute(user_id=user_id)
@@ -135,10 +147,15 @@ def cancel_plan(
 
 
 @router.delete("/api/profile/account", response_model=ActionSuccessResponse)
+@router.delete(
+    "/api/perfil/conta",
+    response_model=ActionSuccessResponse,
+    include_in_schema=False,
+)
 def delete_account(
     user_id: Annotated[int, Depends(require_user)],
     use_case: Annotated[
-        DeleteUserAccountUseCase, Depends(get_delete_user_account_use_case)
+        DeleteUserAccountUseCase, Depends(provide(DeleteUserAccountUseCase))
     ],
 ) -> ActionSuccessResponse:
     success = use_case.execute(user_id=user_id)
@@ -152,7 +169,8 @@ def delete_account(
 def get_annual_stats(
     user_id: Annotated[int, Depends(require_user)],
     use_case: Annotated[
-        GetAnnualListeningStatsUseCase, Depends(get_annual_stats_use_case)
+        GetAnnualListeningStatsUseCase,
+        Depends(provide(GetAnnualListeningStatsUseCase)),
     ],
 ) -> AnnualStatsResponse:
     stats = use_case.execute(user_id=user_id)
@@ -164,7 +182,7 @@ def change_interaction(
     req: ChangeInteractionRequest,
     use_case: Annotated[
         ChangeTrackInteractionUseCase,
-        Depends(get_change_track_interaction_use_case),
+        Depends(provide(ChangeTrackInteractionUseCase)),
     ],
 ) -> InteractionResponse:
     action = InteractionAction(req.new_action.lower())
@@ -180,7 +198,8 @@ def change_interaction(
 def list_history(
     user_id: Annotated[int, Depends(require_user)],
     use_case: Annotated[
-        ListUserInteractionsUseCase, Depends(get_list_user_interactions_use_case)
+        ListUserInteractionsUseCase,
+        Depends(provide(ListUserInteractionsUseCase)),
     ],
     category: Annotated[str | None, Query()] = None,
 ) -> list[InteractionResponse]:
@@ -190,29 +209,41 @@ def list_history(
 
 
 @router.get("/api/profile/blocked-genres", response_model=list[str])
+@router.get(
+    "/api/perfil/generos-bloqueados",
+    response_model=list[str],
+    include_in_schema=False,
+)
 def list_blocked_genres(
     user_id: Annotated[int, Depends(require_user)],
     use_case: Annotated[
-        ListBlockedGenresUseCase, Depends(get_list_blocked_genres_use_case)
+        ListBlockedGenresUseCase, Depends(provide(ListBlockedGenresUseCase))
     ],
 ) -> list[str]:
     return use_case.execute(user_id=user_id)
 
 
 @router.put("/api/profile/blocked-genres", response_model=UserResponse)
+@router.put(
+    "/api/perfil/generos-bloqueados",
+    response_model=UserResponse,
+    include_in_schema=False,
+)
 def update_blocked_genres(
     req: BlockedGenresRequest,
     use_case: Annotated[
-        UpdateBlockedGenresUseCase, Depends(get_update_blocked_genres_use_case)
+        UpdateBlockedGenresUseCase, Depends(provide(UpdateBlockedGenresUseCase))
     ],
+    auth_user_id: Annotated[int, Depends(require_user)] = 0,
 ) -> UserResponse:
+    uid = req.user_id or auth_user_id
     if isinstance(req.blocked_genres, str):
         blocked_list = [g.strip() for g in req.blocked_genres.split(",") if g.strip()]
     else:
         blocked_list = [str(g).strip() for g in req.blocked_genres if str(g).strip()]
 
     user = use_case.execute(
-        user_id=req.user_id,
+        user_id=uid,
         blocked_genres=blocked_list,
     )
     return UserResponse.model_validate(user)
@@ -222,40 +253,70 @@ def update_blocked_genres(
 
 
 @router.get("/api/profile/family/members", response_model=list[UserResponse])
+@router.get(
+    "/api/perfil/familia/membros",
+    response_model=list[UserResponse],
+    include_in_schema=False,
+)
 def list_family_members(
-    primary_account_id: Annotated[int, Query()],
     use_case: Annotated[
-        ListFamilyMembersUseCase, Depends(get_list_family_members_use_case)
+        ListFamilyMembersUseCase, Depends(provide(ListFamilyMembersUseCase))
     ],
+    primary_account_id: Annotated[int | None, Query()] = None,
+    auth_user_id: Annotated[int, Depends(require_user)] = 0,
 ) -> list[UserResponse]:
-    members = use_case.execute(primary_user_id=primary_account_id)
+    pid = primary_account_id or auth_user_id
+    members = use_case.execute(primary_user_id=pid)
     return [UserResponse.model_validate(m) for m in members]
 
 
 @router.post("/api/profile/family/members", response_model=UserResponse)
+@router.post(
+    "/api/perfil/familia/membros",
+    response_model=UserResponse,
+    include_in_schema=False,
+)
 def add_family_member(
     req: AddFamilyMemberRequest,
     use_case: Annotated[
-        AddFamilyMemberUseCase, Depends(get_add_family_member_use_case)
+        AddFamilyMemberUseCase, Depends(provide(AddFamilyMemberUseCase))
     ],
+    auth_user_id: Annotated[int, Depends(require_user)] = 0,
 ) -> UserResponse:
-    dependent = use_case.execute(
-        primary_user_id=req.primary_account_id,
-        dependent_user_id=req.dependent_user_id,
-    )
+    pid = req.primary_account_id or auth_user_id
+    if req.email:
+        dependent = use_case.execute(
+            primary_user_id=pid,
+            email=req.email,
+            password=req.password,
+            display_name=req.display_name,
+            birth_date=req.birth_date,
+        )
+    else:
+        dependent = use_case.execute(
+            primary_user_id=pid,
+            dependent_user_id=req.dependent_user_id,
+        )
     return UserResponse.model_validate(dependent)
 
 
 @router.delete("/api/profile/family/members/{member_id}", response_model=UserResponse)
+@router.delete(
+    "/api/perfil/familia/membros/{member_id}",
+    response_model=UserResponse,
+    include_in_schema=False,
+)
 def remove_family_member(
     member_id: int,
-    primary_account_id: Annotated[int, Query()],
     use_case: Annotated[
-        RemoveFamilyMemberUseCase, Depends(get_remove_family_member_use_case)
+        RemoveFamilyMemberUseCase, Depends(provide(RemoveFamilyMemberUseCase))
     ],
+    primary_account_id: Annotated[int | None, Query()] = None,
+    auth_user_id: Annotated[int, Depends(require_user)] = 0,
 ) -> UserResponse:
+    pid = primary_account_id or auth_user_id
     unlinked = use_case.execute(
-        primary_user_id=primary_account_id,
+        primary_user_id=pid,
         member_user_id=member_id,
     )
     return UserResponse.model_validate(unlinked)

@@ -8,11 +8,13 @@ from app.application.ports.services.music_service import (
     TrackPreviewPort,
 )
 from app.application.ports.services.password_hasher import PasswordHasherPort
+from app.application.ports.services.token_service import TokenServicePort
 
 __all__ = [
     "CatalogTrack",
     "PasswordHasherPort",
     "PlaylistExportPort",
+    "TokenServicePort",
     "TrackCatalogPort",
     "TrackPreview",
     "TrackPreviewPort",

@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from app.application.commands.discovery_commands import RecordSwipeCommand
+from app.application.dtos.discovery_dtos import RecordSwipeCommand
 from app.application.ports.repositories.interaction_repository import (
     InteractionRepositoryPort,
 )
@@ -13,7 +13,10 @@ from app.application.ports.repositories.user_repository import UserRepositoryPor
 from app.application.use_cases.discovery.record_swipe_interaction import (
     RecordSwipeInteractionUseCase,
 )
-from app.domain.exceptions import EntityNotFoundError
+from app.domain.exceptions import (
+    BusinessRuleViolationError,
+    EntityNotFoundError,
+)
 from app.domain.models.interaction import InteractionAction
 from app.domain.models.track import Track
 from app.domain.models.user import User
@@ -172,3 +175,137 @@ def test_record_swipe_interaction_soft_deleted_track_raises_entity_not_found() -
         use_case.execute(command)
 
     interaction_repo.save.assert_not_called()
+
+
+def test_record_swipe_interaction_minor_on_explicit_track_raises_violation() -> None:
+    minor_user = User(
+        user_id=1,
+        email="minor@ribbit.com",
+        password_hash="pw",
+        display_name="Tadpole",
+        age=14,
+        plan_id=1,
+    )
+    explicit_track = Track(
+        track_id=10,
+        title="Explicit Song",
+        artist="Artist",
+        duration_seconds=180,
+        genre="Rap",
+        explicit=True,
+    )
+
+    user_repo = MagicMock(spec=UserRepositoryPort)
+    user_repo.find_by_id.return_value = minor_user
+
+    track_repo = MagicMock(spec=TrackRepositoryPort)
+    track_repo.find_by_id.return_value = explicit_track
+
+    interaction_repo = MagicMock(spec=InteractionRepositoryPort)
+
+    use_case = RecordSwipeInteractionUseCase(
+        user_repo=user_repo,
+        track_repo=track_repo,
+        interaction_repo=interaction_repo,
+    )
+    command = RecordSwipeCommand(
+        user_id=1,
+        track_id=10,
+        action=InteractionAction.LIKE,
+    )
+
+    with pytest.raises(
+        BusinessRuleViolationError, match="bloqueada para usuários menores"
+    ):
+        use_case.execute(command)
+
+    interaction_repo.save.assert_not_called()
+
+
+def test_record_swipe_interaction_blocked_genre_raises_violation() -> None:
+    user = User(
+        user_id=1,
+        email="user@ribbit.com",
+        password_hash="pw",
+        display_name="Frog",
+        age=25,
+        plan_id=1,
+        blocked_genres=frozenset({"metal"}),
+    )
+    metal_track = Track(
+        track_id=10,
+        title="Heavy Beats",
+        artist="Artist",
+        duration_seconds=180,
+        genre="Metal",
+        explicit=False,
+    )
+
+    user_repo = MagicMock(spec=UserRepositoryPort)
+    user_repo.find_by_id.return_value = user
+
+    track_repo = MagicMock(spec=TrackRepositoryPort)
+    track_repo.find_by_id.return_value = metal_track
+
+    interaction_repo = MagicMock(spec=InteractionRepositoryPort)
+
+    use_case = RecordSwipeInteractionUseCase(
+        user_repo=user_repo,
+        track_repo=track_repo,
+        interaction_repo=interaction_repo,
+    )
+    command = RecordSwipeCommand(
+        user_id=1,
+        track_id=10,
+        action=InteractionAction.LIKE,
+    )
+
+    with pytest.raises(
+        BusinessRuleViolationError, match="Gênero bloqueado pelo usuário"
+    ):
+        use_case.execute(command)
+
+    interaction_repo.save.assert_not_called()
+
+
+def test_record_swipe_interaction_string_synonym_action_saves_correctly() -> None:
+    user = User(
+        user_id=1,
+        email="user@ribbit.com",
+        password_hash="pw",
+        display_name="Frog",
+        age=25,
+        plan_id=1,
+    )
+    track = Track(
+        track_id=10,
+        title="Nice Track",
+        artist="Artist",
+        duration_seconds=180,
+        genre="Pop",
+        explicit=False,
+    )
+
+    user_repo = MagicMock(spec=UserRepositoryPort)
+    user_repo.find_by_id.return_value = user
+
+    track_repo = MagicMock(spec=TrackRepositoryPort)
+    track_repo.find_by_id.return_value = track
+
+    interaction_repo = MagicMock(spec=InteractionRepositoryPort)
+    interaction_repo.save.side_effect = lambda i: i
+
+    use_case = RecordSwipeInteractionUseCase(
+        user_repo=user_repo,
+        track_repo=track_repo,
+        interaction_repo=interaction_repo,
+    )
+    command = RecordSwipeCommand(
+        user_id=1,
+        track_id=10,
+        action="amada",
+    )
+
+    result = use_case.execute(command)
+
+    assert result.action == InteractionAction.SUPERLIKE

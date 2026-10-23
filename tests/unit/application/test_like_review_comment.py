@@ -7,8 +7,12 @@ import pytest
 from app.application.use_cases.review.like_review_comment import (
     LikeReviewCommentUseCase,
 )
-from app.domain.exceptions import BusinessRuleViolationError, EntityNotFoundError
+from app.domain.exceptions import EntityNotFoundError
 from app.domain.models import ReviewComment
+
+
+def _identity_review(r: ReviewComment) -> ReviewComment:
+    return r
 
 
 def test_like_review_comment_success() -> None:
@@ -23,7 +27,7 @@ def test_like_review_comment_success() -> None:
     review_repo = MagicMock()
     review_repo.find_by_id.return_value = review
     review_repo.has_user_liked.return_value = False
-    review_repo.save.side_effect = lambda r: r
+    review_repo.save.side_effect = _identity_review
 
     use_case = LikeReviewCommentUseCase(review_repo=review_repo)
     result = use_case.execute(review_id=1, user_id=20)
@@ -34,7 +38,7 @@ def test_like_review_comment_success() -> None:
     review_repo.record_like.assert_called_once_with(1, 20)
 
 
-def test_like_review_comment_already_liked_raises_error() -> None:
+def test_like_review_comment_already_liked_is_idempotent() -> None:
     review = ReviewComment(
         review_id=1,
         user_id=10,
@@ -48,10 +52,10 @@ def test_like_review_comment_already_liked_raises_error() -> None:
     review_repo.has_user_liked.return_value = True
 
     use_case = LikeReviewCommentUseCase(review_repo=review_repo)
+    result = use_case.execute(review_id=1, user_id=20)
 
-    with pytest.raises(BusinessRuleViolationError, match="already liked"):
-        use_case.execute(review_id=1, user_id=20)
-
+    assert result.likes_count == 3
+    review_repo.has_user_liked.assert_called_once_with(1, 20)
     review_repo.record_like.assert_not_called()
     review_repo.save.assert_not_called()
 
