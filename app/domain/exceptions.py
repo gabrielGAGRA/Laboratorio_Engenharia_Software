@@ -111,6 +111,9 @@ class PermissionDeniedError(DomainError):
         super().__init__(message, details=details)
 
 
+UnauthorizedError = AuthenticationRequiredError
+ForbiddenError = PermissionDeniedError
+
 __all__ = [
     "AuthenticationRequiredError",
     "BusinessRuleViolationError",
@@ -119,5 +122,7 @@ __all__ = [
     "DuplicateEntityError",
     "EntityNotFoundError",
     "ExternalServiceError",
+    "ForbiddenError",
     "PermissionDeniedError",
+    "UnauthorizedError",
 ]

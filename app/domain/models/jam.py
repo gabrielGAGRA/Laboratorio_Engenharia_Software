@@ -13,9 +13,7 @@ from app.domain.exceptions import BusinessRuleViolationError
 class Jam:
     @staticmethod
     def generate_room_code() -> str:
-        chars = string.ascii_uppercase + string.digits
-        suffix = "".join(secrets.choice(chars) for _ in range(6))
-        return f"JAM-{suffix}"
+        return "".join(secrets.choice(string.digits) for _ in range(6))
 
     jam_id: int | None = None
     host_user_id: int
@@ -24,6 +22,13 @@ class Jam:
     is_active: bool = True
     current_track_id: int | None = None
     created_at: datetime | None = None
+    duration_minutes: int = 60
+    max_superlikes: int = 10
+    superlikes_used: int = 0
+    skip_votes_threshold: int = 3
+    accumulated_duration_seconds: int = 0
+    deck_source: str = "livre"
+    source_playlist_id: int | None = None
 
     def __post_init__(self) -> None:
         if not self.room_name.strip():
@@ -35,15 +40,50 @@ class Jam:
         host_user_id: int,
         room_name: str,
         room_code: str | None = None,
+        *,
+        duration_minutes: int = 60,
+        max_superlikes: int = 10,
+        skip_votes_threshold: int = 3,
+        deck_source: str = "livre",
+        source_playlist_id: int | None = None,
     ) -> Self:
         return cls(
             host_user_id=host_user_id,
             room_name=room_name,
             room_code=room_code or cls.generate_room_code(),
+            duration_minutes=duration_minutes,
+            max_superlikes=max_superlikes,
+            skip_votes_threshold=skip_votes_threshold,
+            deck_source=deck_source,
+            source_playlist_id=source_playlist_id,
         )
 
     def is_host(self, user_id: int) -> bool:
         return self.host_user_id == user_id
+
+    @property
+    def max_duration_seconds(self) -> int:
+        return self.duration_minutes * 60
+
+    def can_use_superlike(self) -> bool:
+        return self.superlikes_used < self.max_superlikes
+
+    def use_superlike(self) -> Self:
+        if not self.can_use_superlike():
+            raise BusinessRuleViolationError(
+                "Superlike limit reached for this Jam session."
+            )
+        self.superlikes_used += 1
+        return self
+
+    def is_duration_exceeded(self) -> bool:
+        return self.accumulated_duration_seconds >= self.max_duration_seconds
+
+    def add_accumulated_duration(self, seconds: int) -> Self:
+        self.accumulated_duration_seconds += seconds
+        if self.is_duration_exceeded():
+            self.close()
+        return self
 
     def set_current_track(self, track_id: int | None) -> Self:
         if not self.is_active:

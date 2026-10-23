@@ -1,6 +1,5 @@
 """Unit tests for Jam, JamQueueItem, and ReviewComment domain models."""
 
-import string
 from datetime import UTC, datetime
 
 import pytest
@@ -11,18 +10,16 @@ from app.domain.models import Jam, JamQueueItem, ReviewComment
 
 def test_jam_generate_room_code_format() -> None:
     code = Jam.generate_room_code()
-    assert code.startswith("JAM-")
-    suffix = code.removeprefix("JAM-")
-    assert len(suffix) == 6
-    allowed = set(string.ascii_uppercase + string.digits)
-    assert set(suffix).issubset(allowed)
+    assert len(code) == 6
+    assert code.isdigit()
 
 
 def test_jam_create_and_properties() -> None:
     jam = Jam.create(host_user_id=10, room_name="Friday Chill")
     assert jam.host_user_id == 10
     assert jam.room_name == "Friday Chill"
-    assert jam.room_code.startswith("JAM-")
+    assert len(jam.room_code) == 6
+    assert jam.room_code.isdigit()
     assert jam.is_active is True
     assert jam.current_track_id is None
     assert jam.is_host(10) is True
