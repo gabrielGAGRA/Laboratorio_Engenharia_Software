@@ -18,6 +18,8 @@ def _row_to_user(row: sqlite3.Row) -> User:
     created_at = (
         datetime.fromisoformat(row["created_at"]) if row["created_at"] else None
     )
+    keys = row.keys()
+    birth_date = row["birth_date"] if "birth_date" in keys else None
     return User(
         user_id=row["user_id"],
         email=row["email"],
@@ -30,6 +32,7 @@ def _row_to_user(row: sqlite3.Row) -> User:
         blocked_genres=blocked_genres,
         is_admin=bool(row["is_admin"]),
         created_at=created_at,
+        birth_date=birth_date,
     )
 
 
@@ -76,7 +79,8 @@ class SQLiteUserRepository(UserRepositoryPort):
                         plan_id = ?,
                         primary_account_id = ?,
                         blocked_genres = ?,
-                        is_admin = ?
+                        is_admin = ?,
+                        birth_date = ?
                     WHERE user_id = ?
                     """,
                     (
@@ -89,6 +93,7 @@ class SQLiteUserRepository(UserRepositoryPort):
                         user.primary_account_id,
                         blocked_str,
                         1 if user.is_admin else 0,
+                        user.birth_date,
                         user.user_id,
                     ),
                 )
@@ -101,8 +106,8 @@ class SQLiteUserRepository(UserRepositoryPort):
             """
             INSERT INTO users (
                 email, password_hash, spotify_id, display_name, age,
-                plan_id, primary_account_id, blocked_genres, is_admin, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                plan_id, primary_account_id, blocked_genres, is_admin, created_at, birth_date
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 user.email.lower().strip(),
@@ -115,6 +120,7 @@ class SQLiteUserRepository(UserRepositoryPort):
                 blocked_str,
                 1 if user.is_admin else 0,
                 created_at_str,
+                user.birth_date,
             ),
         )
         self.conn.commit()

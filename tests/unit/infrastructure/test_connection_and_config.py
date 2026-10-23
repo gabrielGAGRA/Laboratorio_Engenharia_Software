@@ -7,7 +7,7 @@ import pytest
 
 from app.composition import build_container, create_app
 from app.config import Settings, load_settings
-from app.infrastructure.persistence.connection import (
+from app.infrastructure.repositories.connection import (
     SCHEMA_PATH,
     create_connection,
     transaction,

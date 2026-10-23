@@ -17,8 +17,8 @@ from app.domain.models import (
     Track,
     User,
 )
-from app.infrastructure.persistence.connection import SCHEMA_PATH
 from app.infrastructure.repositories import (
+    SCHEMA_PATH,
     SQLiteAuditLogRepository,
     SQLiteInteractionRepository,
     SQLiteJamRepository,

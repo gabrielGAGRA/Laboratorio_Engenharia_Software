@@ -136,5 +136,26 @@ class SQLiteReviewRepository(ReviewRepositoryPort):
         )
         self.conn.commit()
 
+    def find_active_by_user_and_track(
+        self, user_id: int, track_id: int
+    ) -> ReviewComment | None:
+        cursor = self.conn.execute(
+            """
+            SELECT * FROM reviews
+            WHERE user_id = ? AND track_id = ? AND is_deleted = 0
+            """,
+            (user_id, track_id),
+        )
+        row = cursor.fetchone()
+        return _row_to_review(row) if row else None
+
+    def delete(self, review_id: int) -> bool:
+        cursor = self.conn.execute(
+            "UPDATE reviews SET is_deleted = 1 WHERE review_id = ?",
+            (review_id,),
+        )
+        self.conn.commit()
+        return cursor.rowcount > 0
+
 
 __all__ = ["SQLiteReviewRepository"]

@@ -106,6 +106,43 @@ class SQLiteTrackRepository(TrackRepositoryPort):
                 return self.find_by_id(track.track_id) or track
             raise EntityNotFoundError(entity_name="Track", entity_id=track.track_id)
 
+        if track.track_id is None and track.spotify_id:
+            existing = self.find_by_spotify_id(track.spotify_id)
+            if existing is not None and existing.track_id is not None:
+                self.conn.execute(
+                    """
+                    UPDATE tracks
+                    SET title = ?,
+                        artist = ?,
+                        album = ?,
+                        duration_seconds = ?,
+                        genre = ?,
+                        country = ?,
+                        release_year = ?,
+                        cover_url = ?,
+                        itunes_preview_url = coalesce(?, itunes_preview_url),
+                        explicit = ?,
+                        is_deleted = ?
+                    WHERE track_id = ?
+                    """,
+                    (
+                        track.title,
+                        track.artist,
+                        track.album,
+                        track.duration_seconds,
+                        track.genre,
+                        track.country,
+                        track.release_year,
+                        track.cover_url,
+                        track.itunes_preview_url,
+                        1 if track.explicit else 0,
+                        1 if track.is_deleted else 0,
+                        existing.track_id,
+                    ),
+                )
+                self.conn.commit()
+                return self.find_by_id(existing.track_id) or existing
+
         created_at_str = (track.created_at or datetime.now(UTC)).isoformat()
         cursor = self.conn.execute(
             """
@@ -221,6 +258,21 @@ class SQLiteTrackRepository(TrackRepositoryPort):
         cursor = self.conn.execute("SELECT COUNT(*) FROM tracks WHERE is_deleted = 0")
         row = cursor.fetchone()
         return int(row[0]) if row else 0
+
+    def find_by_spotify_id(self, spotify_id: str) -> Track | None:
+        cursor = self.conn.execute(
+            "SELECT * FROM tracks WHERE spotify_id = ?",
+            (spotify_id,),
+        )
+        row = cursor.fetchone()
+        return _row_to_track(row) if row else None
+
+    def list_blocked(self) -> list[Track]:
+        cursor = self.conn.execute(
+            "SELECT * FROM tracks WHERE is_deleted = 1 ORDER BY track_id ASC"
+        )
+        rows = cursor.fetchall()
+        return [_row_to_track(r) for r in rows]
 
 
 __all__ = ["SQLiteTrackRepository"]

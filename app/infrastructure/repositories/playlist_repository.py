@@ -16,6 +16,11 @@ def _row_to_playlist(row: sqlite3.Row, tracks: list[Track]) -> Playlist:
     created_at = (
         datetime.fromisoformat(row["created_at"]) if row["created_at"] else None
     )
+    keys = row.keys()
+    max_duration = (
+        row["max_duration_seconds"] if "max_duration_seconds" in keys else None
+    )
+    deck_filters = row["deck_filters"] if "deck_filters" in keys else None
     return Playlist(
         playlist_id=row["playlist_id"],
         user_id=row["user_id"],
@@ -24,6 +29,8 @@ def _row_to_playlist(row: sqlite3.Row, tracks: list[Track]) -> Playlist:
         spotify_playlist_id=row["spotify_playlist_id"],
         is_exported=bool(row["is_exported"]),
         created_at=created_at,
+        max_duration_seconds=max_duration,
+        deck_filters=deck_filters,
         initial_tracks=tracks,
     )
 
@@ -70,6 +77,22 @@ class SQLitePlaylistRepository(PlaylistRepositoryPort):
             playlists.append(_row_to_playlist(r, tracks))
         return playlists
 
+    def delete(self, playlist_id: int) -> bool:
+        cursor = self.conn.execute(
+            "DELETE FROM playlists WHERE playlist_id = ?",
+            (playlist_id,),
+        )
+        self.conn.commit()
+        return cursor.rowcount > 0
+
+    def remove_track(self, playlist_id: int, track_id: int) -> bool:
+        cursor = self.conn.execute(
+            "DELETE FROM playlist_tracks WHERE playlist_id = ? AND track_id = ?",
+            (playlist_id, track_id),
+        )
+        self.conn.commit()
+        return cursor.rowcount > 0
+
     def save(self, playlist: Playlist) -> Playlist:
         now_str = datetime.now(UTC).isoformat()
         if playlist.playlist_id is not None:
@@ -84,7 +107,9 @@ class SQLitePlaylistRepository(PlaylistRepositoryPort):
                     SET name = ?,
                         description = ?,
                         spotify_playlist_id = ?,
-                        is_exported = ?
+                        is_exported = ?,
+                        max_duration_seconds = ?,
+                        deck_filters = ?
                     WHERE playlist_id = ?
                     """,
                     (
@@ -92,6 +117,8 @@ class SQLitePlaylistRepository(PlaylistRepositoryPort):
                         playlist.description,
                         playlist.spotify_playlist_id,
                         1 if playlist.is_exported else 0,
+                        playlist.max_duration_seconds,
+                        playlist.deck_filters,
                         playlist.playlist_id,
                     ),
                 )
@@ -118,8 +145,9 @@ class SQLitePlaylistRepository(PlaylistRepositoryPort):
         cursor = self.conn.execute(
             """
             INSERT INTO playlists (
-                user_id, name, description, spotify_playlist_id, is_exported, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?)
+                user_id, name, description, spotify_playlist_id, is_exported,
+                created_at, max_duration_seconds, deck_filters
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 playlist.user_id,
@@ -128,6 +156,8 @@ class SQLitePlaylistRepository(PlaylistRepositoryPort):
                 playlist.spotify_playlist_id,
                 1 if playlist.is_exported else 0,
                 created_at_str,
+                playlist.max_duration_seconds,
+                playlist.deck_filters,
             ),
         )
         new_id = cursor.lastrowid

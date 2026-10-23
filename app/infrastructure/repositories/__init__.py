@@ -3,6 +3,12 @@
 from app.infrastructure.repositories.audit_log_repository import (
     SQLiteAuditLogRepository,
 )
+from app.infrastructure.repositories.connection import (
+    DEFAULT_DATABASE_PATH,
+    SCHEMA_PATH,
+    create_connection,
+    transaction,
+)
 from app.infrastructure.repositories.interaction_repository import (
     SQLiteInteractionRepository,
 )
@@ -36,11 +42,13 @@ UserRepository = SQLiteUserRepository
 
 __all__ = [
     "AuditLogRepository",
+    "DEFAULT_DATABASE_PATH",
     "InteractionRepository",
     "JamRepository",
     "PlanRepository",
     "PlaylistRepository",
     "ReviewRepository",
+    "SCHEMA_PATH",
     "SQLiteAuditLogRepository",
     "SQLiteInteractionRepository",
     "SQLiteJamRepository",
@@ -51,4 +59,6 @@ __all__ = [
     "SQLiteUserRepository",
     "TrackRepository",
     "UserRepository",
+    "create_connection",
+    "transaction",
 ]
