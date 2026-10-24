@@ -1,20 +1,6 @@
 [project]
 name = "lab-engenharia-software"
-version = "0.1.0"
 requires-python = ">=3.15"
-dependencies = [
-    "fastapi>=0.115,<1",
-    "pydantic[email]>=2.10,<3",
-    "niquests>=3.0,<4",
-    "uvicorn>=0.34,<1",
-    "pytest>=8,<10",
-    "ruff>=0.9,<1",
-    "pyrefly>=1.4,<2",
-]
-
-[tool.uv]
-package = false
-
 
 
 [tool.ruff]
@@ -156,16 +142,3 @@ check-unannotated-defs = true
 missing-override-decorator = "ignore"
 bad-assignment = "ignore"
 bad-argument-count = "ignore"
-
-
-
-# Zuban: Removed while "lazy import" support isn't added
-# [tool.zuban]
-# strict = true
-# disallow_untyped_defs = true
-# warn_unreachable = true
-# allow_untyped_globals = false
-# check_untyped_defs = true
-# follow_untyped_imports = true
-# exclude_gitignore = true
-# exclude = ["tests"]

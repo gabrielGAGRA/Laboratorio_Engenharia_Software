@@ -4,7 +4,6 @@
 
 ## Backend
 
-- ~~**Autenticação e Autorização Bearer/Token (§7 Auth Transport)**: A autenticação atual usa `usuario_id` fornecido pelo cliente e header `X-Admin-Id`. Substituir por autenticação segura com token Bearer (`Authorization: Bearer <token>`) resolvida via `Depends` com contexto de usuário autenticado e permissões, protegendo endpoints de perfil, exclusão de conta e moderação admin.~~ *(Concluído: implementado via `HMACTokenService` e dependências `require_user` / `require_admin`)*
 - **PostgreSQL em produção**: `DATABASE_URL` default é SQLite local. Provisionar instância Postgres e configurar a variável de ambiente no ambiente de deploy.
 - **Integração real Spotify/iTunes**: `app/infrastructure/apis_externas.py` tem os adaptadores estruturados, mas requer `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` reais. Testar fluxo OAuth de exportação de playlist.
 - **Rate limiting**: Nenhum throttle nos endpoints. Adicionar middleware (ex: `slowapi`) especialmente em `/api/descoberta/proxima` e autenticação.
