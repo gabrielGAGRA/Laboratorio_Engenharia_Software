@@ -98,33 +98,88 @@ O projeto é composto por duas frentes:
 ---
 
 
+```text
+├── app/
+│   ├── api/                           # Backend FastAPI (Python)
+│   └── web/                           # Frontend Angular 19+ (TypeScript, Zoneless, Signals)
+│       ├── src/
+│       │   ├── app/
+│       │   │   ├── core/              # Serviços de estado, persistência e áudio
+│       │   │   ├── shared/            # Componentes visuais reutilizáveis (ícones, modais, toast)
+│       │   │   └── features/          # Domínios de negócio (discover, playlists, jams, explore, profile, etc.)
+│       │   └── styles.css             # Design system completo
+│       ├── angular.json
+│       ├── Dockerfile
+│       └── package.json
+├── packages/
+│   └── shared-types/                  # Interfaces e tipos compartilhados
+└── package.json                       # Raiz do workspace com scripts de conveniência
+```
+
+---
+
 ## Como Executar
 
-### Pré-requisitos
+### 1. Pré-requisitos
+- **Node.js**: versão 20 ou superior (recomendado 22+).
+- **NPM**: gerenciador de pacotes incluído com o Node.
 
-### 1. Instalar dependências
-
-uv sync
-
-### 2. Configurar variáveis de ambiente
-
-
-### 3. Subir o servidor
-
-uv run uvicorn app.main:app --reload
-
-Acesse a documentação interativa em: **http://localhost:8000/docs**
-
-### 4. Rodar os testes
-
-```
-uv run pytest
+### 2. Instalação das Dependências
+Na raiz do repositório, instale as dependências executando:
+```bash
+npm --prefix app/web install
 ```
 
-### 5. Quality gate
+### 3. Iniciar o Frontend em Desenvolvimento
+Inicie o servidor de desenvolvimento a partir da raiz:
+```bash
+npm run dev:web
+```
+*(ou dentro de `app/web`: `npm start`)*
 
-```
-uv run ruff format;
-uv run ruff check --fix;
-uv run zuban check;
-```
+O servidor é iniciado automaticamente com `--host 0.0.0.0 --port 4200`, disponibilizando a aplicação para conexões locais e na rede interna.
+
+---
+
+## Como Visualizar
+
+### No Computador
+Abra qualquer navegador moderno (Chrome, Edge, Firefox, Brave) e acesse:
+- **URL**: [http://localhost:4200](http://localhost:4200)
+
+### No Celular
+
+#### Opção A: Acesso Direto (Mesma rede Wi-Fi)
+1. Conecte o computador e o celular na **mesma rede Wi-Fi**.
+2. No navegador do celular (Chrome ou Samsung Internet), acesse a URL da rede exibida no terminal:
+   - **URL**: `http://<SEU_IP_LOCAL>:4200` *(no seu caso: `http://10.46.214.63:4200`)*
+
+#### Opção B: Acesso via Túnel Seguro (Sem bloqueio de Firewall ou Wi-Fi)
+Se você estiver conectado a uma rede Wi-Fi pública/universitária (como redes `10.x.x.x` que bloqueiam conexões diretas entre dispositivos) ou se o Firewall do Windows estiver impedindo a conexão direta:
+
+1. Deixe o servidor rodando em um terminal (`npm run dev:web`).
+2. Em um **segundo terminal**, execute:
+   ```bash
+   npm run tunnel:web
+   ```
+3. O terminal fornecerá um link HTTPS público (ex: `https://meu-app.loca.lt`).
+4. Abra esse link no seu Samsung Galaxy (funciona tanto no Wi-Fi quanto no 4G/5G).
+
+---
+
+### Testes Automatizados & Qualidade
+
+- **Executar testes unitários**:
+  ```bash
+  npm run test:web
+  ```
+- **Checar tipagem estrita com TypeScript**:
+  ```bash
+  npm run typecheck:web
+  ```
+- **Gerar build de produção**:
+  ```bash
+  npm run build:web
+  ```
+
+
