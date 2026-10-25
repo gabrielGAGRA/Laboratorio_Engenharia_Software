@@ -13,7 +13,10 @@ class Settings(BaseModel):
 
     database_path: str = "local.db"
     password_hash_iterations: int = 600_000
-    spotify_token: str | None = None
+    spotify_client_id: str | None = None
+    spotify_client_secret: str | None = None
+    spotify_redirect_uri: str | None = None
+    spotify_refresh_token: str | None = None
     app_title: str = "Ribbit Platform API"
     app_description: str = (
         "Backend V0 with Hexagonal Architecture for Track Discovery and"
@@ -81,7 +84,10 @@ def load_settings() -> Settings:
     return Settings(
         database_path=db_path,
         password_hash_iterations=iterations,
-        spotify_token=os.getenv("SPOTIFY_TOKEN"),
+        spotify_client_id=os.getenv("SPOTIFY_CLIENT_ID") or None,
+        spotify_client_secret=os.getenv("SPOTIFY_CLIENT_SECRET") or None,
+        spotify_redirect_uri=os.getenv("SPOTIFY_REDIRECT_URI") or None,
+        spotify_refresh_token=os.getenv("SPOTIFY_REFRESH_TOKEN") or None,
         app_title=os.getenv("APP_TITLE", "Ribbit Platform API"),
         app_description=os.getenv(
             "APP_DESCRIPTION",

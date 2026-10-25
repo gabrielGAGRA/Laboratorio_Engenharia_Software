@@ -169,3 +169,73 @@ def test_playlist_export_sets_spotify_id_and_flag() -> None:
     assert playlist.export("spotify_pl_abc") is playlist
     assert playlist.is_exported is True
     assert playlist.spotify_playlist_id == "spotify_pl_abc"
+
+
+def test_track_refresh_catalog_metadata_keeps_curated_fields() -> None:
+    track = Track(
+        track_id=1,
+        title="Old",
+        artist="Old",
+        duration_seconds=10,
+        genre="Rock",
+        explicit=True,
+    )
+
+    result = track.refresh_catalog_metadata(
+        title="New",
+        artist="Artist",
+        duration_seconds=200,
+        album="Album",
+        cover_url="http://c",
+        release_year=2020,
+    )
+
+    assert result is track
+    assert (track.title, track.artist, track.duration_seconds) == ("New", "Artist", 200)
+    assert (track.album, track.cover_url, track.release_year) == (
+        "Album",
+        "http://c",
+        2020,
+    )
+    assert (track.genre, track.explicit, track.track_id) == ("Rock", True, 1)
+
+
+def test_track_refresh_catalog_metadata_rejects_non_positive_duration() -> None:
+    track = Track(title="T", artist="A", duration_seconds=10, genre="Rock")
+
+    with pytest.raises(ValueError, match="duration"):
+        track.refresh_catalog_metadata(
+            title="T",
+            artist="A",
+            duration_seconds=0,
+            album=None,
+            cover_url=None,
+            release_year=None,
+        )
+
+    assert track.duration_seconds == 10
+
+
+def test_playlist_replace_tracks_swaps_whole_list() -> None:
+    old = Track(track_id=1, title="Old", artist="A", duration_seconds=10, genre="Rock")
+    new = Track(track_id=2, title="New", artist="A", duration_seconds=20, genre="Rock")
+    playlist = Playlist(user_id=1, name="Mix", initial_tracks=[old])
+
+    assert playlist.replace_tracks([new]) is playlist
+
+    assert playlist.tracks == (new,)
+
+
+def test_playlist_replace_tracks_keeps_previous_tracks_on_rejection() -> None:
+    old = Track(track_id=1, title="Old", artist="A", duration_seconds=10, genre="Rock")
+    long_track = Track(
+        track_id=2, title="Long", artist="A", duration_seconds=100, genre="Rock"
+    )
+    playlist = Playlist(
+        user_id=1, name="Mix", max_duration_seconds=50, initial_tracks=[old]
+    )
+
+    with pytest.raises(BusinessRuleViolationError):
+        playlist.replace_tracks([long_track])
+
+    assert playlist.tracks == (old,)

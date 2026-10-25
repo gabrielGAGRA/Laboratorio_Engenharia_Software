@@ -1,12 +1,16 @@
 """Use case for filtering and searching track catalog."""
 
+import contextlib
 from dataclasses import dataclass
 
-from app.domain.exceptions import EntityNotFoundError
+from app.domain.exceptions import EntityNotFoundError, ExternalServiceError
 lazy from app.application.dtos.review_dtos import SearchTracksCommand
 lazy from app.application.ports.repositories.track_repository import TrackRepositoryPort
 lazy from app.application.ports.repositories.user_repository import UserRepositoryPort
-lazy from app.application.ports.services.music_service import TrackCatalogPort
+lazy from app.application.ports.services.music_service import (
+    CatalogTrack,
+    TrackCatalogPort,
+)
 lazy from app.domain.models.track import Track
 
 
@@ -41,9 +45,11 @@ class SearchTracksUseCase:
             or (str(command.year) if command.year is not None else None)
         )
         if not tracks and query_term and self.music_service is not None:
-            catalog_tracks = self.music_service.search_tracks(
-                query_term, limit=command.limit
-            )
+            catalog_tracks: list[CatalogTrack] = []
+            with contextlib.suppress(ExternalServiceError):
+                catalog_tracks = self.music_service.search_tracks(
+                    query_term, limit=command.limit
+                )
             for ct in catalog_tracks:
                 candidate = Track(
                     title=ct.title or query_term,

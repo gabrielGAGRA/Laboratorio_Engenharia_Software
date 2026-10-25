@@ -93,6 +93,29 @@ class ExternalServiceError(DomainError):
         super().__init__(message, details=ctx)
 
 
+class SpotifyError(ExternalServiceError):
+    """Spotify request failed or answered with an unexpected payload."""
+
+    def __init__(
+        self,
+        message: str = "Spotify request failed.",
+        details: Mapping[str, Any] | None = None,
+    ) -> None:
+        super().__init__(message, service_name="Spotify", details=details)
+
+
+class SpotifyAuthError(SpotifyError):
+    """Spotify credentials or tokens are missing, expired, or revoked."""
+
+
+class SpotifyForbiddenError(SpotifyError):
+    """Spotify denied access: missing scope, user outside the allowlist, or no Premium."""
+
+
+class SpotifyQuotaExceededError(SpotifyError):
+    """Development-mode quota is exhausted; retrying will not help."""
+
+
 class AuthenticationRequiredError(DomainError):
     def __init__(
         self,
@@ -124,5 +147,9 @@ __all__ = [
     "ExternalServiceError",
     "ForbiddenError",
     "PermissionDeniedError",
+    "SpotifyAuthError",
+    "SpotifyError",
+    "SpotifyForbiddenError",
+    "SpotifyQuotaExceededError",
     "UnauthorizedError",
 ]

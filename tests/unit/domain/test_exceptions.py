@@ -11,6 +11,10 @@ from app.domain.exceptions import (
     EntityNotFoundError,
     ExternalServiceError,
     PermissionDeniedError,
+    SpotifyAuthError,
+    SpotifyError,
+    SpotifyForbiddenError,
+    SpotifyQuotaExceededError,
 )
 
 
@@ -165,3 +169,19 @@ def test_exceptions_can_be_raised_and_caught_as_domain_error() -> None:
     with pytest.raises(DomainError) as exc_info:
         raise PermissionDeniedError("Not allowed")
     assert exc_info.value.message == "Not allowed"
+
+
+def test_spotify_errors_are_external_service_errors_tagged_with_provider() -> None:
+    for error_cls in (
+        SpotifyError,
+        SpotifyAuthError,
+        SpotifyForbiddenError,
+        SpotifyQuotaExceededError,
+    ):
+        err = error_cls("boom", details={"status_code": 403})
+        assert isinstance(err, ExternalServiceError)
+        assert err.name == error_cls.__name__
+        assert err.details == {"service_name": "Spotify", "status_code": 403}
+
+    assert SpotifyError().message == "Spotify request failed."
+    assert issubclass(SpotifyAuthError, SpotifyError)

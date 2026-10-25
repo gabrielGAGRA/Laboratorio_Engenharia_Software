@@ -22,6 +22,7 @@ from app.application.ports.repositories import (
 from app.application.ports.services import (
     PasswordHasherPort,
     PlaylistExportPort,
+    PlaylistSourcePort,
     TokenServicePort,
     TrackCatalogPort,
     TrackPreviewPort,
@@ -79,6 +80,10 @@ from app.application.use_cases.review import (
     SaveSearchTrackLikeUseCase,
     SearchTracksUseCase,
 )
+from app.application.use_cases.spotify import (
+    SyncPlaylistFromSpotifyUseCase,
+    SyncTracksFromSpotifyUseCase,
+)
 from app.application.use_cases.user import (
     AddFamilyMemberUseCase,
     CancelSubscriptionPlanUseCase,
@@ -98,6 +103,7 @@ from app.application.use_cases.user import (
 )
 from app.config import Settings, load_settings
 from app.infrastructure.adapters import ITunesAdapter, SpotifyAdapter
+from app.infrastructure.adapters.spotify import SpotifyCredentials
 from app.infrastructure.repositories import (
     SQLiteAuditLogRepository,
     SQLiteInteractionRepository,
@@ -195,6 +201,9 @@ class Container:
     change_track_interaction_use_case: ChangeTrackInteractionUseCase
     get_annual_listening_stats_use_case: GetAnnualListeningStatsUseCase
     link_spotify_account_use_case: LinkSpotifyAccountUseCase
+    # Spotify
+    sync_tracks_from_spotify_use_case: SyncTracksFromSpotifyUseCase
+    sync_playlist_from_spotify_use_case: SyncPlaylistFromSpotifyUseCase
     # Admin
     get_executive_dashboard_use_case: GetExecutiveDashboardUseCase
     list_users_with_plans_use_case: ListUsersWithPlansUseCase
@@ -225,6 +234,7 @@ class Container:
         registry[TrackPreviewPort] = self.preview_service
         registry[TrackCatalogPort] = self.music_service
         registry[PlaylistExportPort] = self.music_service
+        registry[PlaylistSourcePort] = self.music_service
         registry[PasswordHasherPort] = self.password_hasher
         registry[UserRepositoryPort] = self.user_repo
         registry[PlanRepositoryPort] = self.plan_repo
@@ -277,7 +287,17 @@ def build_container(
         expiration_seconds=settings.token_expiration_seconds,
     )
     preview_service = ITunesAdapter()
-    music_service = SpotifyAdapter(spotify_token=settings.spotify_token)
+    spotify_credentials = (
+        SpotifyCredentials(
+            client_id=settings.spotify_client_id,
+            client_secret=settings.spotify_client_secret,
+            redirect_uri=settings.spotify_redirect_uri,
+            refresh_token=settings.spotify_refresh_token,
+        )
+        if settings.spotify_client_id
+        else None
+    )
+    music_service = SpotifyAdapter(spotify_credentials)
 
     user_repo = SQLiteUserRepository(conn)
     plan_repo = SQLitePlanRepository(conn)
@@ -415,6 +435,13 @@ def build_container(
             user_repo, plan_repo, interaction_repo, track_repo
         ),
         link_spotify_account_use_case=LinkSpotifyAccountUseCase(user_repo),
+        # Spotify
+        sync_tracks_from_spotify_use_case=SyncTracksFromSpotifyUseCase(
+            music_service, track_repo
+        ),
+        sync_playlist_from_spotify_use_case=SyncPlaylistFromSpotifyUseCase(
+            user_repo, track_repo, playlist_repo, music_service
+        ),
         # Admin
         get_executive_dashboard_use_case=GetExecutiveDashboardUseCase(
             user_repo, plan_repo

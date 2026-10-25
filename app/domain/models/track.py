@@ -33,6 +33,27 @@ class Track:
         self.explicit = explicit
         return self
 
+    def refresh_catalog_metadata(
+        self,
+        *,
+        title: str,
+        artist: str,
+        duration_seconds: int,
+        album: str | None,
+        cover_url: str | None,
+        release_year: int | None,
+    ) -> Self:
+        """Updates provider-owned fields, keeping genre, explicit flag, and deletion."""
+        if duration_seconds <= 0:
+            raise ValueError("Track duration must be positive.")
+        self.title = title
+        self.artist = artist
+        self.duration_seconds = duration_seconds
+        self.album = album
+        self.cover_url = cover_url
+        self.release_year = release_year
+        return self
+
     def mark_as_deleted(self) -> Self:
         self.is_deleted = True
         return self

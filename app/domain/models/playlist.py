@@ -66,6 +66,18 @@ class Playlist:
         self._tracks = [t for t in self._tracks if t.track_id != track_id]
         return self
 
+    def replace_tracks(self, tracks: Sequence[Track]) -> Self:
+        """Swaps the whole track list, keeping the previous one if any track is rejected."""
+        previous = self._tracks
+        self._tracks = []
+        try:
+            for track in tracks:
+                self.add_track(track)
+        except BusinessRuleViolationError:
+            self._tracks = previous
+            raise
+        return self
+
     def export(self, spotify_playlist_id: str) -> Self:
         self.spotify_playlist_id = spotify_playlist_id
         self.is_exported = True

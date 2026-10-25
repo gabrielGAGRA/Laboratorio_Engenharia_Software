@@ -65,7 +65,7 @@ def test_load_settings_defaults_and_env_overrides(
         "PASSWORD_HASH_ITERATIONS",
         "DATABASE_PATH",
         "DATABASE_URL",
-        "SPOTIFY_TOKEN",
+        "SPOTIFY_CLIENT_ID",
         "APP_TITLE",
         "APP_VERSION",
         "ENVIRONMENT",
@@ -76,13 +76,13 @@ def test_load_settings_defaults_and_env_overrides(
     default_settings = load_settings()
     assert default_settings.database_path == "local.db"
     assert default_settings.password_hash_iterations == 600_000
-    assert default_settings.spotify_token is None
+    assert default_settings.spotify_client_id is None
     assert default_settings.app_title == "Ribbit Platform API"
     assert default_settings.environment == "development"
 
     monkeypatch.setenv("DATABASE_URL", "sqlite:///custom_test.db")
     monkeypatch.setenv("PASSWORD_HASH_ITERATIONS", "15000")
-    monkeypatch.setenv("SPOTIFY_TOKEN", "sp_secret_tok")
+    monkeypatch.setenv("SPOTIFY_CLIENT_ID", "sp_client")
     monkeypatch.setenv("APP_TITLE", "Custom Ribbit")
     monkeypatch.setenv("ENVIRONMENT", "staging")
     monkeypatch.setenv("LOG_LEVEL", "DEBUG")
@@ -90,7 +90,7 @@ def test_load_settings_defaults_and_env_overrides(
     custom_settings = load_settings()
     assert custom_settings.database_path == "custom_test.db"
     assert custom_settings.password_hash_iterations == 15_000
-    assert custom_settings.spotify_token == "sp_secret_tok"
+    assert custom_settings.spotify_client_id == "sp_client"
     assert custom_settings.app_title == "Custom Ribbit"
     assert custom_settings.environment == "staging"
     assert custom_settings.log_level == "DEBUG"
