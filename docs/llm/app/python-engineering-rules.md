@@ -103,16 +103,16 @@ Apply before inventing a new module or leaving a “sparse” constant beside un
 
 ---
 
-## 6. Architecture
+## 6. SOLID
 
-### SOLID
-
-- **SRP — use cases**: A use case coordinates a single business capability and transaction boundary. It loads domain objects, invokes domain behavior, persists changes, and coordinates ports. Business invariants and state transitions belong in entities, value objects, or explicit domain policies — not in use cases by default.
+- **SRP — use cases**: A use case coordinates a single business capability and transaction boundary. It loads domain objects, invokes domain behavior, persists changes, and coordinates ports. Business invariants and state transitions belong in entities or explicit domain policies — not in use cases by default.
 - **OCP**: Add or modify a use case when the business capability changes; add or replace an adapter when an external mechanism or provider changes. Keep provider-specific branching in infrastructure or composition code, not domain/application logic. Do not introduce abstractions merely because a second implementation is theoretically possible.
 - **LSP / ISP**: Honor Protocols; keep ports small.
 - **DIP**: Depend on port/repository Protocols — never on infrastructure concretes outside the composition root. ALWAYS make each adapter/repository concrete implement the Protocol it fulfills. Wire concretes only in the composition root.
 
-### Hexagonal
+---
+
+## 7. Domain
 
 - **Package ownership**: `domain` owns concepts/invariants; `application` owns ports, commands, DTOs, and orchestration; `infrastructure` owns adapters, facades, and other I/O; `presentation` owns transport. Add `helpers/` folders inside layers as needed. Avoid generic dumping packages; a cross-cutting package is acceptable only for truly neutral primitives (IDs, time, result/error primitives, observability interfaces) with explicit ownership. Cross-cutting I/O helpers belong in infrastructure.
 - **Domain**: models, pure logic, exceptions only. Put identity, invariants, and state transitions on entities/value objects (aggregates own navigation and invariants over their own state). Use domain services/policies only when behavior is domain-significant and has no natural entity owner. “Pure” means no concrete infrastructure — the domain may depend on injected abstractions (clock, policy, deterministic ID generator). Domain NEVER imports settings; pass narrow policy values as parameters.
@@ -120,7 +120,9 @@ Apply before inventing a new module or leaving a “sparse” constant beside un
   - **Enums**: Keep alias maps and membership helpers inside the enum type; do not leave post-class module dicts or duplicate frozensets across layers.
 - **Ports vs repositories**: External I/O Protocols are ports. Reserve `repositories` for entity persistence; blob/file storage is a port.
 
-### Composition root
+---
+
+## 8. Composition root
 
 - Each executable entry point owns a composition root (HTTP server, worker/consumer, scheduled job, CLI, migration task, or test fixture/application factory). NEVER force non-HTTP entry points through the HTTP bootstrap; tests use an equivalent bootstrap.
 - Prefer one composition class/function that **inlines** session/client/adapter/use-case/router construction — always in the composition root, NEVER in presentation. Avoid a parallel wiring module in the application layer that imports infrastructure concretes.
@@ -135,7 +137,7 @@ Apply before inventing a new module or leaving a “sparse” constant beside un
 
 ---
 
-## 7. Presentation
+## 9. Presentation
 
 - **Routers/handlers**: Prefer the framework's function-based handlers with dependency injection for use cases and request context. Class-based handlers are acceptable in existing modules — mirror the local style when extending them.
 - **Composition mounts routers**: The composition root mounts already-built routers — no separate presentation-layer aggregator, no infrastructure imports in presentation.
@@ -151,7 +153,7 @@ Apply before inventing a new module or leaving a “sparse” constant beside un
 
 ---
 
-## 8. Application
+## 10. Application
 
 - **Names**: One public `execute()` per use case; descriptive module names; shared helpers may be unsuffixed. Keep helpers modules functions-only; use-case base classes live with the use cases.
 - Routers call use cases directly; NEVER orchestrate in presentation.
@@ -170,16 +172,7 @@ Apply before inventing a new module or leaving a “sparse” constant beside un
 
 ---
 
-## 9. Testing
-
-- **Prefer test-first** for new behavior and defect fixes (especially domain/application). Behavior changes need automated coverage before merge; spikes/emergency fixes need follow-up tests + tracked rationale.
-- **CI**: fakes only — no real external services in developer or PR/CI runs.
-- AAA; match the surrounding test style.
-- No coverage inflation that bypasses business contracts.
-
----
-
-## 10. Comments & Docstrings
+## 11. Comments & Docstrings
 
 ### Comments — minimal by default
 - Add comments only for an invariant, constraint, tradeoff, workaround, or external contract that the code and types cannot express. NEVER narrate control flow or restate adjacent code.

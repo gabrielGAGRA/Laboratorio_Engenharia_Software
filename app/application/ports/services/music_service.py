@@ -1,0 +1,58 @@
+"""Ports and result types for external music catalog and export services."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from app.domain.types import ExternalTrackId
+
+
+@dataclass(slots=True, frozen=True, kw_only=True)
+class CatalogTrack:
+    external_id: ExternalTrackId | str | None
+    title: str | None
+    artist: str
+    album: str | None
+    preview_url: str | None
+
+
+@dataclass(slots=True, frozen=True, kw_only=True)
+class TrackPreview:
+    external_id: ExternalTrackId | str
+    title: str | None
+    artist: str | None
+    preview_url: str | None
+    cover_url: str | None
+
+
+@runtime_checkable
+class TrackCatalogPort(Protocol):
+    def search_tracks(self, query: str, limit: int) -> list[CatalogTrack]: ...
+
+
+@runtime_checkable
+class TrackPreviewPort(Protocol):
+    def find_preview(self, term: str) -> TrackPreview | None:
+        """Returns None when the provider has no match.
+
+        Raises:
+            ExternalServiceError: If the external provider fails or times out.
+        """
+        ...
+
+
+@runtime_checkable
+class PlaylistExportPort(Protocol):
+    def export_playlist(
+        self, account_id: str, name: str, track_ids: Sequence[ExternalTrackId | str]
+    ) -> str:
+        """Returns the identifier of the playlist created at the provider.
+
+        Raises:
+            ExternalServiceError: If the external provider fails or times out.
+        """
+        ...

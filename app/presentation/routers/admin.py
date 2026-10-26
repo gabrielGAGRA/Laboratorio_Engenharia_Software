@@ -1,107 +1,189 @@
-"""Administration routes protected by the authenticated admin role."""
+"""Administration console router for catalog moderation and executive dashboard."""
 
-from typing import Any
+from typing import TYPE_CHECKING, Annotated
 
 from fastapi import APIRouter, Depends
 
-from app.application.admin_use_cases import AdminUseCases
-from app.application.exceptions import BusinessRuleViolationError
-from app.domain.entities import Usuario
-from app.presentation.dependencies import get_admin_use_cases, get_current_admin
+from app.application.dtos.admin_dtos import UpdateSubscriptionPlanInput
+from app.application.dtos.auth_dtos import AuthenticateUserInput
+from app.presentation.dependencies import (
+    get_audience_report_use_case,
+    get_authenticate_admin_use_case,
+    get_block_track_use_case,
+    get_executive_dashboard_use_case,
+    get_list_users_with_plans_use_case,
+    get_promote_user_to_admin_use_case,
+    get_top_moderation_reviews_use_case,
+    get_update_subscription_plan_use_case,
+    get_update_track_explicit_flag_use_case,
+    require_admin,
+)
 from app.presentation.schemas import (
-    AtualizarAdminRequest,
-    AtualizarPlanoAdminRequest,
-    BloquearMusicaRequest,
-    MusicaResponse,
-    PlanoResponse,
-    UsuarioResponse,
+    AudienceReportResponse,
+    ExecutiveDashboardResponse,
+    LoginRequest,
+    PlanResponse,
+    ReviewResponse,
+    TrackBlockResponse,
+    TrackExplicitResponse,
+    UpdatePlanAdminRequest,
+    UpdateTrackExplicitRequest,
+    UserPlanSummaryResponse,
+    UserResponse,
 )
 
-router = APIRouter(
-    prefix="/api/admin",
-    tags=["Admin Console"],
-    dependencies=[Depends(get_current_admin)],
-)
-
-
-@router.get("/dashboard")
-def dashboard_executivo(
-    use_cases: AdminUseCases = Depends(get_admin_use_cases),
-) -> dict[str, Any]:
-    return use_cases.obter_dashboard_executivo()
-
-
-@router.get("/audiencia")
-def relatorio_audiencia(
-    use_cases: AdminUseCases = Depends(get_admin_use_cases),
-) -> dict[str, Any]:
-    return use_cases.obter_relatorio_audiencia()
-
-
-@router.get("/administradores", response_model=list[UsuarioResponse])
-def listar_administradores(
-    use_cases: AdminUseCases = Depends(get_admin_use_cases),
-) -> list[UsuarioResponse]:
-    return [
-        UsuarioResponse.model_validate(usuario)
-        for usuario in use_cases.listar_administradores()
-    ]
-
-
-@router.put("/administradores/{usuario_id}", response_model=UsuarioResponse)
-def atualizar_administrador(
-    usuario_id: int,
-    req: AtualizarAdminRequest,
-    administrador: Usuario = Depends(get_current_admin),
-    use_cases: AdminUseCases = Depends(get_admin_use_cases),
-) -> UsuarioResponse:
-    if administrador.usuario_id == usuario_id and not req.is_admin:
-        raise BusinessRuleViolationError(
-            "O administrador autenticado não pode remover seu próprio acesso."
-        )
-    usuario = use_cases.atualizar_papel_admin(usuario_id, req.is_admin)
-    return UsuarioResponse.model_validate(usuario)
-
-
-@router.get("/musicas-bloqueadas", response_model=list[MusicaResponse])
-def listar_musicas_bloqueadas(
-    use_cases: AdminUseCases = Depends(get_admin_use_cases),
-) -> list[MusicaResponse]:
-    return [
-        MusicaResponse.model_validate(musica)
-        for musica in use_cases.listar_musicas_bloqueadas()
-    ]
-
-
-@router.put("/musicas/{musica_id}/bloquear")
-def bloquear_musica(
-    musica_id: int,
-    req: BloquearMusicaRequest,
-    use_cases: AdminUseCases = Depends(get_admin_use_cases),
-) -> dict[str, int | bool]:
-    return {
-        "musica_id": musica_id,
-        "bloqueada": use_cases.bloquear_musica(musica_id, req.bloqueada),
-    }
-
-
-@router.get("/planos", response_model=list[PlanoResponse])
-def listar_planos(
-    use_cases: AdminUseCases = Depends(get_admin_use_cases),
-) -> list[PlanoResponse]:
-    return [PlanoResponse.model_validate(plano) for plano in use_cases.listar_planos()]
-
-
-@router.put("/planos/{plano_id}", response_model=PlanoResponse)
-def atualizar_plano(
-    plano_id: int,
-    req: AtualizarPlanoAdminRequest,
-    use_cases: AdminUseCases = Depends(get_admin_use_cases),
-) -> PlanoResponse:
-    plano = use_cases.atualizar_planos_existentes(
-        plano_id=plano_id,
-        novo_preco=req.novo_preco,
-        novo_nome=req.novo_nome,
-        max_perfis=req.max_perfis,
+if TYPE_CHECKING:
+    from app.application.use_cases.admin import (
+        BlockTrackUseCase,
+        GetAudienceReportUseCase,
+        GetExecutiveDashboardUseCase,
+        GetTopModerationReviewsUseCase,
+        ListUsersWithPlansUseCase,
+        PromoteUserToAdminUseCase,
+        UpdateSubscriptionPlanUseCase,
+        UpdateTrackExplicitFlagUseCase,
     )
-    return PlanoResponse.model_validate(plano)
+    from app.application.use_cases.auth import AuthenticateAdminUseCase
+
+router = APIRouter(prefix="/api/admin", tags=["Admin Console"])
+
+
+@router.post("/login", response_model=UserResponse)
+def login_admin(
+    req: LoginRequest,
+    use_case: Annotated[
+        AuthenticateAdminUseCase, Depends(get_authenticate_admin_use_case)
+    ],
+) -> UserResponse:
+    admin = use_case.execute(
+        AuthenticateUserInput(email=req.email, password=req.password)
+    )
+    return UserResponse.model_validate(admin)
+
+
+@router.get(
+    "/dashboard",
+    response_model=ExecutiveDashboardResponse,
+    dependencies=[Depends(require_admin)],
+)
+def get_executive_dashboard(
+    use_case: Annotated[
+        GetExecutiveDashboardUseCase, Depends(get_executive_dashboard_use_case)
+    ],
+) -> ExecutiveDashboardResponse:
+    dashboard = use_case.execute()
+    return ExecutiveDashboardResponse.model_validate(dashboard)
+
+
+@router.get(
+    "/users",
+    response_model=list[UserPlanSummaryResponse],
+    dependencies=[Depends(require_admin)],
+)
+def list_users(
+    use_case: Annotated[
+        ListUsersWithPlansUseCase, Depends(get_list_users_with_plans_use_case)
+    ],
+) -> list[UserPlanSummaryResponse]:
+    users = use_case.execute()
+    return [UserPlanSummaryResponse.model_validate(u) for u in users]
+
+
+@router.get(
+    "/audience",
+    response_model=AudienceReportResponse,
+    dependencies=[Depends(require_admin)],
+)
+def get_audience_report(
+    use_case: Annotated[
+        GetAudienceReportUseCase, Depends(get_audience_report_use_case)
+    ],
+) -> AudienceReportResponse:
+    report = use_case.execute()
+    return AudienceReportResponse.model_validate(report)
+
+
+@router.post(
+    "/tracks/{track_id}/block",
+    response_model=TrackBlockResponse,
+    dependencies=[Depends(require_admin)],
+)
+def block_track(
+    track_id: int,
+    use_case: Annotated[BlockTrackUseCase, Depends(get_block_track_use_case)],
+) -> TrackBlockResponse:
+    success = use_case.execute(track_id=track_id)
+    return TrackBlockResponse(blocked=success)
+
+
+@router.put(
+    "/tracks/{track_id}/explicit",
+    response_model=TrackExplicitResponse,
+    dependencies=[Depends(require_admin)],
+)
+def update_track_explicit(
+    track_id: int,
+    req: UpdateTrackExplicitRequest,
+    use_case: Annotated[
+        UpdateTrackExplicitFlagUseCase,
+        Depends(get_update_track_explicit_flag_use_case),
+    ],
+) -> TrackExplicitResponse:
+    explicit = use_case.execute(
+        track_id=track_id,
+        explicit=req.explicit,
+    )
+    return TrackExplicitResponse(track_id=track_id, explicit=explicit)
+
+
+@router.put(
+    "/users/{user_id}/promote-admin",
+    response_model=UserResponse,
+    dependencies=[Depends(require_admin)],
+)
+def promote_user_to_admin(
+    user_id: int,
+    use_case: Annotated[
+        PromoteUserToAdminUseCase, Depends(get_promote_user_to_admin_use_case)
+    ],
+) -> UserResponse:
+    user = use_case.execute(user_id=user_id)
+    return UserResponse.model_validate(user)
+
+
+@router.put(
+    "/plans/{plan_id}",
+    response_model=PlanResponse,
+    dependencies=[Depends(require_admin)],
+)
+def update_plan(
+    plan_id: int,
+    req: UpdatePlanAdminRequest,
+    use_case: Annotated[
+        UpdateSubscriptionPlanUseCase,
+        Depends(get_update_subscription_plan_use_case),
+    ],
+) -> PlanResponse:
+    input_dto = UpdateSubscriptionPlanInput(
+        plan_id=plan_id,
+        new_price=req.new_price,
+        new_name=req.new_name,
+        max_profiles=req.max_profiles,
+    )
+    plan = use_case.execute(input_dto)
+    return PlanResponse.model_validate(plan)
+
+
+@router.get(
+    "/reviews",
+    response_model=list[ReviewResponse],
+    dependencies=[Depends(require_admin)],
+)
+def get_top_moderation_reviews(
+    use_case: Annotated[
+        GetTopModerationReviewsUseCase,
+        Depends(get_top_moderation_reviews_use_case),
+    ],
+) -> list[ReviewResponse]:
+    reviews = use_case.execute()
+    return [ReviewResponse.model_validate(r) for r in reviews]

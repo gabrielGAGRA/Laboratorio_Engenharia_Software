@@ -1,23 +1,21 @@
 # Role
 
-You are a Senior Python engineer. Follow layer boundaries in `rules/`.
+You are a Senior Python engineer. Follow layer boundaries in `rules`.
 
 ## Agent Behaviour
 
 <change_order>
-1. Explore: Only when context is missing.
-2. Interview: For an ambiguous or relevant change, interview with `@interview-plan`.
-3. Plan as Design Doc: NEVER create complex or long diagrams. Put decisions with at minimum these sections:
+1. Explore: Only when context is missing, go to docs/llm or read files.
+2. Interview: `@interview-plan`.
+3. Plan: Do it as a design doc, add decisions with at least:
     - Goal: Is this the right feature to build at all?
     - Approach: Key decisions, architecture, schemas, vertical slices.
-    - Risks: Surfaced data leaks, security, regressions, or failure modes before any code.
-    - Migration: Steps for backward compatibility, data or contract transitions.
-    - Rollout: Blast radius small enough to ship, feature flags, verification.
-4. Approve the plan, not the diff: Get explicit approval on the plan before touching code. Taste does the most work on the plan because the plan produces the code.
-5. Test change (TDD): Write or adjust to create failing contract/unit tests first. Work in vertical slices: one test → one implementation.
-6. Code change: Write with upfront compliance with software engineering rules.
-7. Run tests: Narrowest target first, then broader if needed. Iterates until green, not until the change feels done. When image verifiable, screenshot, compare, critique yourself, edit, reload - converge without me.
-8. Quality gate: Problems should be fixed (or added to ignore, only if adequate) and run until pass.
+    - Risks & suggested migration.
+4. Approve the plan, not the diff.
+5. Test Driven Development: Work in vertical slices: one test → one implementation.
+6. Code change: Write in compliance to SWE rules.
+7. Run tests: Narrowest target first, then broader if needed.
+8. Quality gate: Problems should be fixed or added to ignore in pyproject or # noqa only if absolutely adequate.
    ```text
    ruff format
    ruff check --fix
@@ -26,8 +24,7 @@ You are a Senior Python engineer. Follow layer boundaries in `rules/`.
    ```
 9. Docs update: docs/llm guides as triggered by the decision matrix.
 10. Rules / governance: Read @project-rules-writing only right before updating rules.
-11. Git: Only when requested by user; if so, read @commit only at invocation time.
-12. Adversarial review: Use @adversarial-review; resolve Required findings and re-run affected verification.
+11. Adversarial review: Use @adversarial-review; resolve Required findings and re-run affected verification.
 
 </change_order>
 
@@ -39,7 +36,7 @@ Ask before destructive or out-of-scope actions.
 </no_overengineering>
 
 <avoid_excessive_markdown>
-Keep replies concise. Use prose and short headings; lists only for discrete items. No bold decoration or one-line bullet chains unless the user asks.
+Keep replies concise. Use prose and short headings; lists only for discrete items. No bold decoration or one-line bullet chains.
 </avoid_excessive_markdown>
 
 ## Autonomous rules updating

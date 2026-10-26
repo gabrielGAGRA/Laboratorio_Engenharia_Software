@@ -1,140 +1,102 @@
-"""Playlist library, deck, and export routes."""
+"""Playlist deck, swipe-add, and export router."""
+
+from typing import TYPE_CHECKING, Annotated
 
 from fastapi import APIRouter, Depends, Query, status
 
-from app.application.playlist_use_cases import PlaylistUseCases
-from app.domain.entities import Playlist, Usuario
-from app.presentation.dependencies import get_current_user, get_playlist_use_cases
+from app.application.dtos.playlist_dtos import (
+    AddTrackToPlaylistInput,
+    CreateDeckPlaylistInput,
+)
+from app.presentation.dependencies import (
+    get_add_track_to_playlist_use_case,
+    get_create_deck_playlist_use_case,
+    get_export_playlist_to_spotify_use_case,
+    get_list_user_playlists_use_case,
+)
 from app.presentation.schemas import (
+    ActionSuccessResponse,
     DeckPlaylistRequest,
-    MusicaResponse,
-    PaginaMusicasResponse,
     PlaylistResponse,
-    SwipeAddMusicaRequest,
+    SwipeAddTrackRequest,
 )
 
-router = APIRouter(prefix="/api/playlists", tags=["Playlists"])
-
-
-def _resposta_playlist(playlist: Playlist) -> PlaylistResponse:
-    resposta = PlaylistResponse.model_validate(playlist)
-    resposta.duracao_total_segundos = sum(
-        musica.duracao_segundos for musica in resposta.musicas
+if TYPE_CHECKING:
+    from app.application.use_cases.playlist import (
+        AddTrackToPlaylistUseCase,
+        CreateDeckPlaylistUseCase,
+        ExportPlaylistToSpotifyUseCase,
+        ListUserPlaylistsUseCase,
     )
-    return resposta
+
+router = APIRouter(prefix="/api/playlists", tags=["Playlists"])
 
 
 @router.post(
     "/deck", response_model=PlaylistResponse, status_code=status.HTTP_201_CREATED
 )
-def criar_deck(
+def create_deck_playlist(
     req: DeckPlaylistRequest,
-    usuario: Usuario = Depends(get_current_user),
-    use_cases: PlaylistUseCases = Depends(get_playlist_use_cases),
+    use_case: Annotated[
+        CreateDeckPlaylistUseCase, Depends(get_create_deck_playlist_use_case)
+    ],
 ) -> PlaylistResponse:
-    playlist = use_cases.criar_deck_playlist_por_parametros(
-        usuario_id=usuario.usuario_id,
-        nome=req.nome,
-        duracao_minutos=req.duracao_minutos,
-        genero=req.genero,
-        ano=req.ano,
-        artista=req.artista,
-        pais=req.pais,
-        descricao=req.descricao,
+    playlist = use_case.execute(
+        CreateDeckPlaylistInput(
+            user_id=req.user_id,
+            name=req.name,
+            duration_minutes=req.duration_minutes,
+            genre=req.genre,
+            year=req.year,
+            artist=req.artist,
+            country=req.country,
+            description=req.description,
+        )
     )
-    return _resposta_playlist(playlist)
+    return PlaylistResponse.model_validate(playlist)
+
+
+@router.post("/{playlist_id}/swipe-add", response_model=ActionSuccessResponse)
+def swipe_add_track(
+    playlist_id: int,
+    req: SwipeAddTrackRequest,
+    user_id: Annotated[int, Query()],
+    use_case: Annotated[
+        AddTrackToPlaylistUseCase, Depends(get_add_track_to_playlist_use_case)
+    ],
+) -> ActionSuccessResponse:
+    use_case.execute(
+        AddTrackToPlaylistInput(
+            playlist_id=playlist_id,
+            track_id=req.track_id,
+            user_id=user_id,
+        )
+    )
+    return ActionSuccessResponse(success=True)
 
 
 @router.get("", response_model=list[PlaylistResponse])
-def listar_biblioteca(
-    usuario: Usuario = Depends(get_current_user),
-    use_cases: PlaylistUseCases = Depends(get_playlist_use_cases),
+def list_playlists(
+    user_id: Annotated[int, Query()],
+    use_case: Annotated[
+        ListUserPlaylistsUseCase, Depends(get_list_user_playlists_use_case)
+    ],
 ) -> list[PlaylistResponse]:
-    playlists = use_cases.listar_biblioteca_usuario(usuario_id=usuario.usuario_id)
-    resposta: list[PlaylistResponse] = []
-    for playlist in playlists:
-        if playlist.playlist_id is None:
-            raise RuntimeError("Playlist persistida sem identificador.")
-        resposta.append(
-            _resposta_playlist(
-                use_cases.obter_playlist(playlist.playlist_id, usuario.usuario_id)
-            )
-        )
-    return resposta
+    playlists = use_case.execute(user_id=user_id)
+    return [PlaylistResponse.model_validate(p) for p in playlists]
 
 
-@router.get("/{playlist_id}/deck", response_model=PaginaMusicasResponse)
-def obter_deck(
+@router.post("/{playlist_id}/export-spotify", response_model=PlaylistResponse)
+def export_playlist_to_spotify(
     playlist_id: int,
-    limite: int = Query(default=20, ge=1, le=100),
-    cursor_id: int | None = Query(default=None, gt=0),
-    usuario: Usuario = Depends(get_current_user),
-    use_cases: PlaylistUseCases = Depends(get_playlist_use_cases),
-) -> PaginaMusicasResponse:
-    musicas, next_cursor, has_more = use_cases.obter_deck_playlist(
-        playlist_id, usuario.usuario_id, limite, cursor_id
-    )
-    return PaginaMusicasResponse(
-        items=[MusicaResponse.model_validate(musica) for musica in musicas],
-        next_cursor=next_cursor,
-        has_more=has_more,
-    )
-
-
-@router.post("/{playlist_id}/swipe-add")
-def swipe_add(
-    playlist_id: int,
-    req: SwipeAddMusicaRequest,
-    usuario: Usuario = Depends(get_current_user),
-    use_cases: PlaylistUseCases = Depends(get_playlist_use_cases),
-) -> dict[str, bool]:
-    sucesso = use_cases.adicionar_musica_por_swipe(
-        playlist_id=playlist_id,
-        musica_id=req.musica_id,
-        usuario_id=usuario.usuario_id,
-        acao=req.acao,
-    )
-    return {"sucesso": sucesso}
-
-
-@router.get("/{playlist_id}", response_model=PlaylistResponse)
-def obter_playlist(
-    playlist_id: int,
-    usuario: Usuario = Depends(get_current_user),
-    use_cases: PlaylistUseCases = Depends(get_playlist_use_cases),
+    user_id: Annotated[int, Query()],
+    use_case: Annotated[
+        ExportPlaylistToSpotifyUseCase,
+        Depends(get_export_playlist_to_spotify_use_case),
+    ],
 ) -> PlaylistResponse:
-    return _resposta_playlist(use_cases.obter_playlist(playlist_id, usuario.usuario_id))
-
-
-@router.delete("/{playlist_id}")
-def excluir_playlist(
-    playlist_id: int,
-    usuario: Usuario = Depends(get_current_user),
-    use_cases: PlaylistUseCases = Depends(get_playlist_use_cases),
-) -> dict[str, bool]:
-    return {"sucesso": use_cases.excluir_playlist(playlist_id, usuario.usuario_id)}
-
-
-@router.delete("/{playlist_id}/musicas/{musica_id}")
-def remover_musica(
-    playlist_id: int,
-    musica_id: int,
-    usuario: Usuario = Depends(get_current_user),
-    use_cases: PlaylistUseCases = Depends(get_playlist_use_cases),
-) -> dict[str, bool]:
-    return {
-        "sucesso": use_cases.remover_musica(playlist_id, musica_id, usuario.usuario_id)
-    }
-
-
-@router.post("/{playlist_id}/exportar-spotify", response_model=PlaylistResponse)
-def exportar_spotify(
-    playlist_id: int,
-    usuario: Usuario = Depends(get_current_user),
-    use_cases: PlaylistUseCases = Depends(get_playlist_use_cases),
-) -> PlaylistResponse:
-    playlist = use_cases.exportar_playlist_para_spotify(
-        usuario_id=usuario.usuario_id,
+    playlist = use_case.execute(
+        user_id=user_id,
         playlist_id=playlist_id,
     )
-    return _resposta_playlist(playlist)
+    return PlaylistResponse.model_validate(playlist)

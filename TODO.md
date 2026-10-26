@@ -6,19 +6,20 @@ Itens abertos e dívidas técnicas conhecidas. Atualize esta lista ao deferir al
 
 ## Backend — V0 (MVP Local)
 
-- **Alembic**: O startup aplica migrações aditivas simples, mas ainda não há histórico versionado de schema. Adotar Alembic antes de evoluir o schema de produção.
-- **PostgreSQL em produção**: `DATABASE_URL` usa SQLite local por padrão. Provisionar PostgreSQL e configurar a variável no ambiente de deploy.
-- **Integração Spotify**: Exportação continua mockada/preparatória; implementar OAuth e exportação real antes de habilitar a integração.
-- **Rate limiting**: Nenhum throttle nos endpoints. Adicionar rate limiting para autenticação e descoberta antes de exposição pública.
-- **Cobertura**: Além dos fluxos E2E, os testes unitários agora cobrem regras de reviews, relatório de audiência/receita admin e filtros etários, de gêneros bloqueados e de músicas rejeitadas nos decks de playlist e Jam.
-- **Seed local**: Contém planos, músicas de amostra e administrador local; é desabilitado com `RIBBIT_ENV=production`.
+- **JWT real**: Autenticação atual usa `X-Usuario-Id` / `X-Admin-Id` como headers de identidade (adequado para V0 universitário). 
+- **Alembic**: Sem sistema de migração de banco. Criar configuração Alembic para gerenciar schema em PostgreSQL de produção.
+- **PostgreSQL em produção**: `DATABASE_URL` default é SQLite local. Provisionar instância Postgres e configurar a variável de ambiente no ambiente de deploy.
+- **Integração real Spotify/iTunes**: `app/infrastructure/apis_externas.py` tem os adaptadores estruturados, mas requer `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` reais. Testar fluxo OAuth de exportação de playlist.
+- **Rate limiting**: Nenhum throttle nos endpoints. Adicionar middleware (ex: `slowapi`) especialmente em `/api/descoberta/proxima` e autenticação.
+- **Testes de Jams, Reviews e Admin**: Cobertura atual concentrada em Auth, Descoberta, Playlist e Perfil. Adicionar testes unitários para `jam_use_cases.py`, `review_use_cases.py` e `admin_use_cases.py`.
+- **`seed.py` temporário**: O script de seed com planos e músicas de amostra é exclusivo para desenvolvimento local. Remover do startup de produção quando houver dados reais.
 
 ---
 
 ## Backend — Funcionalidades Futuras
 
 - **Deck de amigo na Jam**: Envio direto de superlikes para o deck de outro participante não está modelado na V0. Definir tabela e use case quando a feature for detalhada.
-- **Perfis infantis sem credenciais próprias**: Dependentes do plano Família possuem atualmente sua própria conta; perfis sem e-mail/senha não estão modelados.
+- **Perfis infantis**: Perfis sem e-mail/senha própria (dependentes sem conta Ribbit) ficaram fora do MVP.
 - **Playlists contextuais avançadas**: Filtros por localização, clima e atividade específica (treino, estudo) planejados mas não implementados.
 - **Desfazer interação (Undo swipe)**: Botão de desfazer da última faixa avaliada está na especificação de UI mas sem rota no backend.
 - **WebSocket para Jams**: `obter_estado_e_checar_progresso` é hoje um endpoint REST com polling. Migrar para WebSocket para UX em tempo real.
