@@ -1,0 +1,121 @@
+"""SQLite implementation of the review and comment persistence port."""
+
+from __future__ import annotations
+
+from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import sqlite3
+
+from app.application.ports.repositories.review_repository import ReviewRepositoryPort
+from app.domain.models.review import ReviewComment
+
+
+def _row_to_review(row: sqlite3.Row) -> ReviewComment:
+    created_at = (
+        datetime.fromisoformat(row["created_at"]) if row["created_at"] else None
+    )
+    return ReviewComment(
+        review_id=row["review_id"],
+        user_id=row["user_id"],
+        track_id=row["track_id"],
+        initial_rating=int(row["rating"]),
+        text=row["text"],
+        initial_likes_count=int(row["likes_count"]),
+        is_deleted=bool(row["is_deleted"]),
+        created_at=created_at,
+    )
+
+
+class SQLiteReviewRepository(ReviewRepositoryPort):
+    """SQLite adapter implementing ReviewRepositoryPort."""
+
+    def __init__(self, conn: sqlite3.Connection) -> None:
+        self.conn = conn
+
+    def find_by_id(self, review_id: int) -> ReviewComment | None:
+        cursor = self.conn.execute(
+            "SELECT * FROM reviews WHERE review_id = ?",
+            (review_id,),
+        )
+        row = cursor.fetchone()
+        return _row_to_review(row) if row else None
+
+    def save(self, review: ReviewComment) -> ReviewComment:
+        if review.review_id is not None:
+            cursor = self.conn.execute(
+                "SELECT review_id FROM reviews WHERE review_id = ?",
+                (review.review_id,),
+            )
+            if cursor.fetchone():
+                self.conn.execute(
+                    """
+                    UPDATE reviews
+                    SET rating = ?,
+                        text = ?,
+                        likes_count = ?,
+                        is_deleted = ?
+                    WHERE review_id = ?
+                    """,
+                    (
+                        review.rating,
+                        review.text,
+                        review.likes_count,
+                        1 if review.is_deleted else 0,
+                        review.review_id,
+                    ),
+                )
+                self.conn.commit()
+                return self.find_by_id(review.review_id) or review
+
+        created_at_str = (review.created_at or datetime.now(UTC)).isoformat()
+        cursor = self.conn.execute(
+            """
+            INSERT INTO reviews (
+                user_id, track_id, rating, text, likes_count, is_deleted, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                review.user_id,
+                review.track_id,
+                review.rating,
+                review.text,
+                review.likes_count,
+                1 if review.is_deleted else 0,
+                created_at_str,
+            ),
+        )
+        self.conn.commit()
+        new_id = cursor.lastrowid
+        return self.find_by_id(new_id) or review
+
+    def list_by_track(self, track_id: int, limit: int) -> list[ReviewComment]:
+        cursor = self.conn.execute(
+            """
+            SELECT * FROM reviews
+            WHERE track_id = ? AND is_deleted = 0
+            ORDER BY created_at DESC
+            LIMIT ?
+            """,
+            (track_id, limit),
+        )
+        rows = cursor.fetchall()
+        return [_row_to_review(r) for r in rows]
+
+    def list_top_recent(self, days: int, limit: int) -> list[ReviewComment]:
+        min_date_str = (datetime.now(UTC) - timedelta(days=days)).isoformat()
+        cursor = self.conn.execute(
+            """
+            SELECT * FROM reviews
+            WHERE is_deleted = 0 AND created_at >= ?
+            ORDER BY likes_count DESC, created_at DESC
+            LIMIT ?
+            """,
+            (min_date_str, limit),
+        )
+        rows = cursor.fetchall()
+        return [_row_to_review(r) for r in rows]
+
+
+__all__ = ["SQLiteReviewRepository"]

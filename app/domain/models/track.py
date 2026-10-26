@@ -1,0 +1,37 @@
+"""Domain model representing a music track."""
+
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Self
+
+if TYPE_CHECKING:
+    from datetime import datetime
+
+
+@dataclass(slots=True, kw_only=True, eq=False)
+class Track:
+    track_id: int | None = None
+    title: str
+    artist: str
+    duration_seconds: int
+    genre: str
+    spotify_id: str | None = None
+    album: str | None = None
+    country: str | None = None
+    release_year: int | None = None
+    cover_url: str | None = None
+    itunes_preview_url: str | None = None
+    explicit: bool = False
+    is_deleted: bool = False
+    created_at: datetime | None = None
+
+    def __post_init__(self) -> None:
+        if self.duration_seconds <= 0:
+            raise ValueError("Track duration must be positive.")
+
+    def mark_as_deleted(self) -> Self:
+        self.is_deleted = True
+        return self
+
+    def restore(self) -> Self:
+        self.is_deleted = False
+        return self
