@@ -97,31 +97,9 @@ O projeto é composto por duas frentes:
 
 ---
 
-
-```text
-├── app/
-│   ├── api/                           # Backend FastAPI (Python)
-│   └── web/                           # Frontend Angular 19+ (TypeScript, Zoneless, Signals)
-│       ├── src/
-│       │   ├── app/
-│       │   │   ├── core/              # Serviços de estado, persistência e áudio
-│       │   │   ├── shared/            # Componentes visuais reutilizáveis (ícones, modais, toast)
-│       │   │   └── features/          # Domínios de negócio (discover, playlists, jams, explore, profile, etc.)
-│       │   └── styles.css             # Design system completo
-│       ├── angular.json
-│       ├── Dockerfile
-│       └── package.json
-├── packages/
-│   └── shared-types/                  # Interfaces e tipos compartilhados
-└── package.json                       # Raiz do workspace com scripts de conveniência
-```
-
----
-
 ## Como Executar
 
 ### 1. Pré-requisitos
-- **Node.js**: versão 20 ou superior (recomendado 22+).
 - **NPM**: gerenciador de pacotes incluído com o Node.
 
 ### 2. Instalação das Dependências
