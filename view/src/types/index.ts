@@ -104,4 +104,3 @@ export interface RankedGenre {
   readonly percentage: number;
   readonly rank: string;
 }
-

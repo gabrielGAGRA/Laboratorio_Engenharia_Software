@@ -6,10 +6,54 @@
     "lab-engenharia-software-view": {
       "projectType": "application",
       "schematics": {},
-      "root": "",
-      "sourceRoot": "view",
+      "root": "view",
+      "sourceRoot": "view/src",
       "prefix": "app",
-      "architect": {}
+      "architect": {
+        "build": {
+          "builder": "@angular-devkit/build-angular:application",
+          "options": {
+            "outputPath": "view/dist/web",
+            "index": "view/src/index.html",
+            "browser": "view/src/main.ts",
+            "polyfills": [],
+            "tsConfig": "view/tsconfig.app.json",
+            "assets": [],
+            "styles": ["view/src/styles.css"],
+            "scripts": []
+          },
+          "configurations": {
+            "production": {
+              "optimization": true,
+              "sourceMap": false
+            },
+            "development": {
+              "optimization": false,
+              "sourceMap": true
+            }
+          },
+          "defaultConfiguration": "production"
+        },
+        "serve": {
+          "builder": "@angular-devkit/build-angular:dev-server",
+          "options": {
+            "host": "0.0.0.0",
+            "port": 4200
+          },
+          "configurations": {
+            "production": {
+              "buildTarget": "lab-engenharia-software-view:build:production"
+            },
+            "development": {
+              "buildTarget": "lab-engenharia-software-view:build:development"
+            }
+          },
+          "defaultConfiguration": "development"
+        }
+      }
     }
+  },
+  "cli": {
+    "analytics": false
   }
 }

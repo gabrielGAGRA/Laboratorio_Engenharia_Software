@@ -19,7 +19,15 @@
     "verbatimModuleSyntax": true,
     "isolatedModules": true,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "experimentalDecorators": true,
+    "useUnknownInCatchVariables": true,
+    "paths": {
+      "@ribbit/shared-types": ["./view/src/types/index.ts"],
+      "@core/*": ["./view/src/app/core/*"],
+      "@shared/*": ["./view/src/app/shared/*"],
+      "@features/*": ["./view/src/app/features/*"]
+    }
   },
   "include": [
     "view/**/*.ts"

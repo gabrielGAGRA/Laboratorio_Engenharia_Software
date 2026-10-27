@@ -18,7 +18,7 @@ You are a Senior Python engineer. Follow layer boundaries in `rules`.
    ```
    ruff format;
    ruff check --fix;
-   pyrefly app tests;
+   pyrefly check;
    find-dup-defs app --only py --error-thickness 0.3 -D @find-dup-defs.directives;
    ```
 9. Docs update: docs/llm guides as triggered by the decision matrix.
