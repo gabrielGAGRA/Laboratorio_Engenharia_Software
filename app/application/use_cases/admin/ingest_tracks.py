@@ -58,7 +58,7 @@ class IngestTracksFromCatalogUseCase:
             title=item.title,
             artist=item.artist,
             duration_seconds=item.duration_seconds,
-            genre=item.genre,
+            genre=item.genre or "",
             album=item.album,
             country=item.country,
             release_year=item.release_year,

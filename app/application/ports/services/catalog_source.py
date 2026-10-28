@@ -12,7 +12,7 @@ class CatalogSourceTrack:
     title: str
     artist: str
     duration_seconds: int = 180
-    genre: str = "Unknown"
+    genre: str | None = "Unknown"
     album: str | None = None
     country: str | None = None
     release_year: int | None = None
