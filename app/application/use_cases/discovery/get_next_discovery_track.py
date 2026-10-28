@@ -1,5 +1,6 @@
 """Use case for fetching the next track candidate for swipe discovery."""
 
+import contextlib
 from dataclasses import dataclass
 
 from app.domain.exceptions import EntityNotFoundError
@@ -8,6 +9,7 @@ lazy from app.application.ports.repositories.interaction_repository import (
 )
 lazy from app.application.ports.repositories.track_repository import TrackRepositoryPort
 lazy from app.application.ports.repositories.user_repository import UserRepositoryPort
+lazy from app.application.ports.services.catalog_source import TrackCatalogFilePort
 lazy from app.application.ports.services.music_service import TrackPreviewPort
 lazy from app.domain.models.track import Track
 
@@ -20,6 +22,7 @@ class GetNextDiscoveryTrackUseCase:
     track_repo: TrackRepositoryPort
     interaction_repo: InteractionRepositoryPort
     track_preview_port: TrackPreviewPort | None = None
+    catalog_file_port: TrackCatalogFilePort | None = None
 
     def execute(self, user_id: int) -> Track | None:
         user = self.user_repo.find_by_id(user_id)
@@ -41,12 +44,33 @@ class GetNextDiscoveryTrackUseCase:
             return None
 
         track = candidates[0]
-        if not track.itunes_preview_url and self.track_preview_port is not None:
+        needs_preview = not track.itunes_preview_url
+        needs_genre = not track.genre
+        if (needs_preview or needs_genre) and self.track_preview_port is not None:
             preview = self.track_preview_port.find_preview(
                 f"{track.artist} {track.title}"
             )
-            if preview and preview.preview_url:
-                track.itunes_preview_url = str(preview.preview_url)
-                self.track_repo.save(track)
+            if preview:
+                changed = False
+                if needs_preview and preview.preview_url:
+                    track.itunes_preview_url = str(preview.preview_url)
+                    changed = True
+                if needs_genre and preview.genre:
+                    track.genre = str(preview.genre)
+                    changed = True
+                if changed:
+                    self.track_repo.save(track)
+                    if self.catalog_file_port is not None:
+                        with contextlib.suppress(Exception):
+                            self.catalog_file_port.write_track_delta(
+                                title=track.title,
+                                artist=track.artist,
+                                preview_url=track.itunes_preview_url,
+                                genre=track.genre,
+                                spotify_id=track.spotify_id,
+                            )
 
         return track
+
+
+__all__ = ["GetNextDiscoveryTrackUseCase"]

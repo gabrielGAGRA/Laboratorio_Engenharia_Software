@@ -41,6 +41,7 @@ class ITunesAdapter(TrackPreviewPort):
                         artist=first.get("artistName"),
                         preview_url=first.get("previewUrl"),
                         cover_url=first.get("artworkUrl100"),
+                        genre=first.get("primaryGenreName"),
                     )
                 return None
             raise ExternalServiceError(
