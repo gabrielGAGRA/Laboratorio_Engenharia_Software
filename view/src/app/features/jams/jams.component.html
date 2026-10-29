@@ -1,0 +1,130 @@
+<div class="secondary-page">
+  <div class="feature-banner jam-banner">
+    <div>
+      <span class="eyebrow blue">SEU PONTO DE ENCONTRO MUSICAL</span>
+      <h2>
+        Uma sala. Muitos gostos.<br />
+        Uma vibe só.
+      </h2>
+      <p>Cada voto ajuda a construir a próxima descoberta.</p>
+      <button class="primary-button" (click)="openJamModal()">
+        <app-icon name="plus" [size]="17" />
+        {{ state.jamState().active ? 'Convidar amigos' : 'Criar uma Jam' }}
+      </button>
+    </div>
+    <div class="jam-orbit">
+      <app-icon name="users" [size]="55" />
+      <span>JL</span>
+      <span>AC</span>
+      <span>MR</span>
+    </div>
+  </div>
+
+  @if (state.jamState().active) {
+    <div class="panel jam-room">
+      <div class="section-title">
+        <h2>
+          {{ state.jamState().roomName }}
+          <span class="live-label">DEMO</span>
+        </h2>
+        <button class="text-button" (click)="copyCode()">
+          {{ state.jamState().code }} <app-icon name="send" [size]="15" />
+        </button>
+      </div>
+      <p class="muted">Sala local de demonstração · 1 participante</p>
+
+      <div class="jam-timer">
+        <span>Tempo total da Jam</span>
+        <strong>
+          {{ state.jamState().durationHours }}h
+          {{ formattedDurationMinutes() }}min
+        </strong>
+        <span>+ 18 min de músicas</span>
+      </div>
+      <div class="duration-bar">
+        <i></i>
+      </div>
+
+      <div class="section-title">
+        <h3>Tocando agora</h3>
+      </div>
+      <div class="song-row">
+        <div class="song-cover">
+          <img [src]="currentSong().image" alt="" />
+        </div>
+        <div class="song-description">
+          <strong>{{ currentSong().title }}</strong>
+          <span>{{ currentSong().artist }}</span>
+        </div>
+        <span class="song-time">{{ currentSong().time }}</span>
+      </div>
+
+      <div class="jam-votes">
+        <button class="outline-button" (click)="voteSkip()">
+          Votar para pular · {{ state.jamVotes() }}/{{
+            state.jamState().voteThreshold
+          }}
+        </button>
+        <button class="primary-button" (click)="likeCurrent()">
+          Curtir <app-icon name="heart" [size]="17" />
+        </button>
+      </div>
+
+      <div class="section-title">
+        <h3>Próximas na fila</h3>
+      </div>
+      @for (s of upcomingSongs(); track s.title; let i = $index) {
+        <div class="song-row">
+          <div class="song-cover">
+            <img [src]="s.image" alt="" />
+          </div>
+          <div class="song-description">
+            <strong>{{ s.title }}</strong>
+            <span>{{ s.artist }}</span>
+          </div>
+          <div class="jam-track-actions">
+            <span>
+              <app-icon name="heart" [size]="14" />
+              {{ 12 - i * 2 }}
+            </span>
+            <span>
+              <app-icon name="star" [size]="14" />
+              {{ 4 - i }}
+            </span>
+            <button
+              class="icon-button"
+              [attr.aria-label]="'Adicionar ' + s.title + ' às favoritas'"
+              (click)="loveTrack(s)"
+            >
+              <app-icon name="plus" [size]="16" />
+            </button>
+          </div>
+        </div>
+      }
+
+      <button
+        class="primary-button full-width jam-swipe-button"
+        (click)="goToDiscover()"
+      >
+        <app-icon name="pond" [size]="17" /> Dar likes para esta Jam
+      </button>
+    </div>
+  } @else {
+    <div class="panel join-panel">
+      <app-icon name="headphones" [size]="32" />
+      <h2>Já tem uma Jam rolando?</h2>
+      <p>Entre usando o código compartilhado por um amigo.</p>
+      <form (submit)="onJoinSubmit($event)">
+        <input
+          required
+          name="jamCode"
+          placeholder="Código da Jam"
+          aria-label="Código da Jam"
+        />
+        <button class="outline-button" type="submit">
+          Entrar <app-icon name="arrow" [size]="16" />
+        </button>
+      </form>
+    </div>
+  }
+</div>
