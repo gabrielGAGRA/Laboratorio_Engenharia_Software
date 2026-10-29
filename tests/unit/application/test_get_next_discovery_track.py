@@ -210,3 +210,74 @@ def test_get_next_discovery_track_fetches_itunes_preview_fallback_when_missing()
     assert result.itunes_preview_url == "https://audio-ssl.itunes.apple.com/preview.m4a"
     preview_service.find_preview.assert_called_once_with("DJ Toad Midnight Hop")
     track_repo.save.assert_called_once_with(track_without_preview)
+
+
+def test_get_next_discovery_track_enriches_genre_and_writes_track_delta() -> None:
+    from app.application.ports.services.catalog_source import (
+        TrackCatalogFilePort,
+    )
+    from app.application.ports.services.music_service import (
+        TrackPreview,
+        TrackPreviewPort,
+    )
+
+    user = User(
+        user_id=1,
+        email="adult@ribbit.com",
+        password_hash="pw",
+        display_name="Adult Frog",
+        age=25,
+        plan_id=1,
+    )
+    track_without_genre = Track(
+        track_id=15,
+        title="Pond Jump",
+        artist="DJ Toad",
+        duration_seconds=180,
+        genre="",
+        itunes_preview_url="https://preview.itunes.apple.com/preview.m4a",
+        spotify_id="spot-15",
+    )
+
+    user_repo = MagicMock(spec=UserRepositoryPort)
+    user_repo.find_by_id.return_value = user
+
+    interaction_repo = MagicMock(spec=InteractionRepositoryPort)
+    interaction_repo.list_interacted_track_ids.return_value = []
+
+    track_repo = MagicMock(spec=TrackRepositoryPort)
+    track_repo.list_active.return_value = [track_without_genre]
+    track_repo.save.side_effect = lambda t: t
+
+    preview_service = MagicMock(spec=TrackPreviewPort)
+    preview_service.find_preview.return_value = TrackPreview(
+        external_id="ext-15",
+        title="Pond Jump",
+        artist="DJ Toad",
+        preview_url="https://preview.itunes.apple.com/preview.m4a",
+        cover_url=None,
+        genre="Hip-Hop",
+    )
+
+    catalog_port = MagicMock(spec=TrackCatalogFilePort)
+
+    use_case = GetNextDiscoveryTrackUseCase(
+        user_repo=user_repo,
+        track_repo=track_repo,
+        interaction_repo=interaction_repo,
+        track_preview_port=preview_service,
+        catalog_file_port=catalog_port,
+    )
+
+    result = use_case.execute(user_id=1)
+
+    assert result is not None
+    assert result.genre == "Hip-Hop"
+    track_repo.save.assert_called_once_with(track_without_genre)
+    catalog_port.write_track_delta.assert_called_once_with(
+        title="Pond Jump",
+        artist="DJ Toad",
+        preview_url="https://preview.itunes.apple.com/preview.m4a",
+        genre="Hip-Hop",
+        spotify_id="spot-15",
+    )

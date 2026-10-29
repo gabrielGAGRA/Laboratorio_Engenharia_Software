@@ -73,3 +73,10 @@ uvicorn==0.54.0
     # via lab-engenharia-software (pyproject.toml)
 wassima==2.1.5
     # via niquests
+google-cloud-storage==3.17.1
+    # via lab-engenharia-software
+python-dotenv==1.0.1
+    # via lab-engenharia-software
+pyarrow==26.0.0
+    # via lab-engenharia-software
+

@@ -10,6 +10,7 @@ from app.application.dtos import (
 )
 from app.application.use_cases.admin import (
     BlockTrackUseCase,
+    CompactCatalogUseCase,
     GetAudienceReportUseCase,
     GetExecutiveDashboardUseCase,
     GetTopModerationReviewsUseCase,
@@ -17,12 +18,14 @@ from app.application.use_cases.admin import (
     ListBlockedTracksUseCase,
     ListUsersWithPlansUseCase,
     PromoteUserToAdminUseCase,
+    SyncCatalogVersionUseCase,
     UpdateAdminRoleUseCase,
     UpdateSubscriptionPlanUseCase,
     UpdateTrackExplicitFlagUseCase,
+    UpdateTrackGenreUseCase,
 )
 from app.application.use_cases.auth import AuthenticateAdminUseCase
-from app.domain.exceptions import BusinessRuleViolationError
+from app.domain.exceptions import BusinessRuleViolationError, ExternalServiceError
 from app.presentation.dependencies import (
     get_container,
     provide,
@@ -31,13 +34,17 @@ from app.presentation.dependencies import (
 from app.presentation.schemas.admin import (
     AudienceReportResponse,
     BlockTrackRequest,
+    CompactCatalogResponse,
     ExecutiveDashboardResponse,
     PlanResponse,
+    SyncCatalogVersionResponse,
     TrackBlockResponse,
     TrackExplicitResponse,
+    TrackGenreResponse,
     UpdateAdminRoleRequest,
     UpdatePlanAdminRequest,
     UpdateTrackExplicitRequest,
+    UpdateTrackGenreRequest,
     UserPlanSummaryResponse,
 )
 from app.presentation.schemas.auth import LoginRequest, UserResponse
@@ -77,6 +84,24 @@ def _get_list_blocked_tracks_use_case(
         return container.resolve(ListBlockedTracksUseCase)
     except KeyError:
         return ListBlockedTracksUseCase(track_repo=container.track_repo)
+
+
+def _get_compact_catalog_use_case(
+    request: Request,
+) -> CompactCatalogUseCase:
+    container = get_container(request)
+    if container.compact_catalog_use_case is None:
+        raise ExternalServiceError("Catalog file storage is not configured.")
+    return container.compact_catalog_use_case
+
+
+def _get_sync_catalog_version_use_case(
+    request: Request,
+) -> SyncCatalogVersionUseCase:
+    container = get_container(request)
+    if container.sync_catalog_version_use_case is None:
+        raise ExternalServiceError("Catalog file storage is not configured.")
+    return container.sync_catalog_version_use_case
 
 
 @router.post("/login", response_model=UserResponse)
@@ -245,6 +270,26 @@ def update_track_explicit(
 
 
 @router.put(
+    "/tracks/{track_id}/genre",
+    response_model=TrackGenreResponse,
+)
+def update_track_genre(
+    track_id: int,
+    req: UpdateTrackGenreRequest,
+    use_case: Annotated[
+        UpdateTrackGenreUseCase,
+        Depends(provide(UpdateTrackGenreUseCase)),
+    ],
+    admin_id: Annotated[int, Depends(require_admin)] = 0,
+) -> TrackGenreResponse:
+    genre = use_case.execute(
+        track_id=track_id,
+        genre=req.genre,
+    )
+    return TrackGenreResponse(track_id=track_id, genre=genre)
+
+
+@router.put(
     "/users/{user_id}/promote-admin",
     response_model=UserResponse,
 )
@@ -318,6 +363,40 @@ def get_top_moderation_reviews(
 ) -> list[ReviewResponse]:
     reviews = use_case.execute()
     return [ReviewResponse.model_validate(r) for r in reviews]
+
+
+@router.post(
+    "/catalog/compact",
+    response_model=CompactCatalogResponse,
+)
+def compact_catalog(
+    use_case: Annotated[CompactCatalogUseCase, Depends(_get_compact_catalog_use_case)],
+    admin_id: Annotated[int, Depends(require_admin)] = 0,
+) -> CompactCatalogResponse:
+    result = use_case.execute()
+    return CompactCatalogResponse(
+        new_version=result.new_version,
+        message=result.message,
+    )
+
+
+@router.post(
+    "/catalog/sync",
+    response_model=SyncCatalogVersionResponse,
+)
+def sync_catalog(
+    use_case: Annotated[
+        SyncCatalogVersionUseCase, Depends(_get_sync_catalog_version_use_case)
+    ],
+    force: bool = False,
+    admin_id: Annotated[int, Depends(require_admin)] = 0,
+) -> SyncCatalogVersionResponse:
+    result = use_case.execute(force=force)
+    return SyncCatalogVersionResponse(
+        synced=result.synced,
+        version=result.version,
+        message=result.message,
+    )
 
 
 __all__ = ["router"]

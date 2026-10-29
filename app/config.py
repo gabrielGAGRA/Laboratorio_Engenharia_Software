@@ -1,5 +1,6 @@
 """Configuration settings for the Ribbit application."""
 
+import contextlib
 import os
 from typing import Self
 
@@ -29,6 +30,8 @@ class Settings(BaseModel):
     token_expiration_seconds: int = 43200
     admin_email: str = "admin@ribbit.example.com"
     admin_password: str = "RibbitLocal2026!"  # noqa: S105
+    gcs_bucket_name: str | None = None
+    gcs_tracks_file_path: str = "Songs/songs_final.parquet"
 
     @model_validator(mode="after")
     def _validate_production_secret_key(self) -> Self:  # noqa: N804
@@ -42,7 +45,13 @@ class Settings(BaseModel):
 
 def load_settings() -> Settings:
     """Loads configuration settings from environment variables with ergonomic defaults."""
+    with contextlib.suppress(ImportError):
+        from dotenv import load_dotenv  # noqa: PLC0415
+
+        load_dotenv()
+
     raw_iterations = os.getenv("PASSWORD_HASH_ITERATIONS")
+
     iterations = (
         int(raw_iterations) if raw_iterations and raw_iterations.isdigit() else 600_000
     )
@@ -101,6 +110,10 @@ def load_settings() -> Settings:
         token_expiration_seconds=token_expiration,
         admin_email=admin_email,
         admin_password=admin_password,
+        gcs_bucket_name=os.getenv("GCS_BUCKET_NAME") or None,
+        gcs_tracks_file_path=os.getenv(
+            "GCS_TRACKS_FILE_PATH", "Songs/songs_final.parquet"
+        ),
     )
 
 

@@ -27,6 +27,7 @@ class TrackPreview:
     artist: str | None
     preview_url: str | None
     cover_url: str | None
+    genre: str | None = None
 
 
 @dataclass(slots=True, frozen=True, kw_only=True)

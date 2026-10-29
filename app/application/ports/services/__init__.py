@@ -1,5 +1,10 @@
 """External service and utility ports."""
 
+from app.application.ports.services.catalog_source import (
+    CatalogSourceTrack,
+    CatalogVersionInfo,
+    TrackCatalogFilePort,
+)
 from app.application.ports.services.music_service import (
     CatalogTrack,
     PlaylistExportPort,
@@ -19,7 +24,9 @@ from app.application.ports.services.spotify import (
 from app.application.ports.services.token_service import TokenServicePort
 
 __all__ = [
+    "CatalogSourceTrack",
     "CatalogTrack",
+    "CatalogVersionInfo",
     "PasswordHasherPort",
     "PlaylistExportPort",
     "PlaylistItemsPage",
@@ -29,6 +36,7 @@ __all__ = [
     "SpotifyPlaylistsPort",
     "SpotifyQueuePort",
     "TokenServicePort",
+    "TrackCatalogFilePort",
     "TrackCatalogPort",
     "TrackPreview",
     "TrackPreviewPort",

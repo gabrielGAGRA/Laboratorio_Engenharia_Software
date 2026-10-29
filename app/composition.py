@@ -24,22 +24,27 @@ from app.application.ports.services import (
     PlaylistExportPort,
     PlaylistSourcePort,
     TokenServicePort,
+    TrackCatalogFilePort,
     TrackCatalogPort,
     TrackPreviewPort,
 )
 from app.application.use_cases.admin import (
     BlockTrackUseCase,
+    CompactCatalogUseCase,
     GetAudienceReportUseCase,
     GetAuditLogsUseCase,
     GetExecutiveDashboardUseCase,
     GetTopModerationReviewsUseCase,
+    IngestTracksFromCatalogUseCase,
     ListAdministratorsUseCase,
     ListBlockedTracksUseCase,
     ListUsersWithPlansUseCase,
     PromoteUserToAdminUseCase,
+    SyncCatalogVersionUseCase,
     UpdateAdminRoleUseCase,
     UpdateSubscriptionPlanUseCase,
     UpdateTrackExplicitFlagUseCase,
+    UpdateTrackGenreUseCase,
 )
 from app.application.use_cases.auth import (
     AuthenticateAdminUseCase,
@@ -102,7 +107,12 @@ from app.application.use_cases.user import (
     UpdateProfileUseCase,
 )
 from app.config import Settings, load_settings
-from app.infrastructure.adapters import ITunesAdapter, SpotifyAdapter
+from app.domain.exceptions import ExternalServiceError
+from app.infrastructure.adapters import (
+    GCSTrackCatalogAdapter,
+    ITunesAdapter,
+    SpotifyAdapter,
+)
 from app.infrastructure.adapters.spotify import SpotifyCredentials
 from app.infrastructure.repositories import (
     SQLiteAuditLogRepository,
@@ -211,12 +221,17 @@ class Container:
     update_admin_role_use_case: UpdateAdminRoleUseCase
     update_subscription_plan_use_case: UpdateSubscriptionPlanUseCase
     update_track_explicit_flag_use_case: UpdateTrackExplicitFlagUseCase
+    update_track_genre_use_case: UpdateTrackGenreUseCase
     block_track_use_case: BlockTrackUseCase
     list_blocked_tracks_use_case: ListBlockedTracksUseCase
     get_top_moderation_reviews_use_case: GetTopModerationReviewsUseCase
     get_audience_report_use_case: GetAudienceReportUseCase
     get_audit_logs_use_case: GetAuditLogsUseCase
     promote_user_to_admin_use_case: PromoteUserToAdminUseCase
+    catalog_file_port: TrackCatalogFilePort | None = None
+    ingest_tracks_from_catalog_use_case: IngestTracksFromCatalogUseCase | None = None
+    compact_catalog_use_case: CompactCatalogUseCase | None = None
+    sync_catalog_version_use_case: SyncCatalogVersionUseCase | None = None
     _type_registry: dict[type, Any] = field(
         default_factory=dict, init=False, repr=False
     )
@@ -244,6 +259,16 @@ class Container:
         registry[JamRepositoryPort] = self.jam_repo
         registry[ReviewRepositoryPort] = self.review_repo
         registry[AuditLogRepositoryPort] = self.audit_log_repo
+        if self.catalog_file_port is not None:
+            registry[TrackCatalogFilePort] = self.catalog_file_port
+        if self.ingest_tracks_from_catalog_use_case is not None:
+            registry[IngestTracksFromCatalogUseCase] = (
+                self.ingest_tracks_from_catalog_use_case
+            )
+        if self.compact_catalog_use_case is not None:
+            registry[CompactCatalogUseCase] = self.compact_catalog_use_case
+        if self.sync_catalog_version_use_case is not None:
+            registry[SyncCatalogVersionUseCase] = self.sync_catalog_version_use_case
 
         object.__setattr__(self, "_type_registry", registry)
 
@@ -308,6 +333,40 @@ def build_container(
     review_repo = SQLiteReviewRepository(conn)
     audit_log_repo = SQLiteAuditLogRepository(conn)
 
+    catalog_adapter = (
+        GCSTrackCatalogAdapter(
+            bucket_name=settings.gcs_bucket_name,
+            file_path=settings.gcs_tracks_file_path,
+        )
+        if settings.gcs_bucket_name
+        else None
+    )
+    ingest_tracks_use_case = (
+        IngestTracksFromCatalogUseCase(
+            track_repo=track_repo,
+            catalog_file_port=catalog_adapter,
+        )
+        if catalog_adapter is not None
+        else None
+    )
+    compact_catalog_use_case = (
+        CompactCatalogUseCase(
+            catalog_file_port=catalog_adapter,
+            audit_log_repo=audit_log_repo,
+        )
+        if catalog_adapter is not None
+        else None
+    )
+    sync_catalog_version_use_case = (
+        SyncCatalogVersionUseCase(
+            catalog_file_port=catalog_adapter,
+            ingest_use_case=ingest_tracks_use_case,
+            audit_log_repo=audit_log_repo,
+        )
+        if catalog_adapter is not None and ingest_tracks_use_case is not None
+        else None
+    )
+
     return Container(
         settings=settings,
         connection=conn,
@@ -335,7 +394,11 @@ def build_container(
         ),
         # Discovery
         get_next_discovery_track_use_case=GetNextDiscoveryTrackUseCase(
-            user_repo, track_repo, interaction_repo, track_preview_port=preview_service
+            user_repo,
+            track_repo,
+            interaction_repo,
+            track_preview_port=preview_service,
+            catalog_file_port=catalog_adapter,
         ),
         record_swipe_interaction_use_case=RecordSwipeInteractionUseCase(
             user_repo, track_repo, interaction_repo
@@ -453,12 +516,19 @@ def build_container(
             plan_repo, user_repo=user_repo
         ),
         update_track_explicit_flag_use_case=UpdateTrackExplicitFlagUseCase(track_repo),
+        update_track_genre_use_case=UpdateTrackGenreUseCase(
+            track_repo=track_repo, catalog_file_port=catalog_adapter
+        ),
         block_track_use_case=BlockTrackUseCase(track_repo),
         list_blocked_tracks_use_case=ListBlockedTracksUseCase(track_repo),
         get_top_moderation_reviews_use_case=GetTopModerationReviewsUseCase(review_repo),
         get_audience_report_use_case=GetAudienceReportUseCase(user_repo, track_repo),
         get_audit_logs_use_case=GetAuditLogsUseCase(audit_log_repo),
         promote_user_to_admin_use_case=PromoteUserToAdminUseCase(user_repo),
+        catalog_file_port=catalog_adapter,
+        ingest_tracks_from_catalog_use_case=ingest_tracks_use_case,
+        compact_catalog_use_case=compact_catalog_use_case,
+        sync_catalog_version_use_case=sync_catalog_version_use_case,
     )
 
 
@@ -490,6 +560,13 @@ def create_app(
         settings=resolved_settings,
         password_hasher=container.password_hasher,
     )
+    if container.ingest_tracks_from_catalog_use_case is not None:
+        try:
+            container.ingest_tracks_from_catalog_use_case.execute()
+        except (ExternalServiceError, RuntimeError) as exc:
+            logging.getLogger("app").warning(
+                "Initial GCS tracks ingestion skipped or failed: %s", exc
+            )
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
